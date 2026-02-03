@@ -28,11 +28,11 @@ const schemeFromBundleId = `manus${timestamp}`;
 
 const env = {
   // App branding - update these values directly (do not use env vars)
-  appName: "LocalConnect - 地域メディア×イベント×チケットアプリ",
-  appSlug: "local-connect-app",
+  appName: "LocalConnect",
+  appSlug: "{{project_name}}",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "",
+  logoUrl: "https://private-us-east-1.manuscdn.com/sessionFile/tEjTscynjhQa4O5kpTqlJP/sandbox/ej7rmHKtiKSijtrDKoaW98-img-1_1770137626000_na1fn_bG9jYWwtY29ubmVjdC1sb2dv.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvdEVqVHNjeW5qaFFhNE81a3BUcWxKUC9zYW5kYm94L2VqN3JtSEt0aUtTaWp0ckRLb2FXOTgtaW1nLTFfMTc3MDEzNzYyNjAwMF9uYTFmbl9iRzlqWVd3dFkyOXVibVZqZEMxc2IyZHYucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=Sv4gziRwImscm-aSEUPVqpMrQzrFhxH40uG6rxVkatnE49iHDXv4Sv26xbf1fu183vgwP-CLR6cUqfH6SLVeCtcuEmFMPiGsGkADLLKA7pcPupmh-g9gDMfMqqxO~S0Z0Pt9a11jyzyA0TdW-X1GZ~IGXPeHGNAjF9AyVcEKSMnM9aFoYnNQqlmadSgIpHkNGxU6K-s64ztdQTF-rDmSAlw~zUTHiDi3tsRJjTDVQj0o7Yc5zTvxqF-KofC~vC7uDIC9nLqEapEZQTgSCseyMHJyTaVg~vGLi~loIKxbrx7fCr4iDbhqr-B8duVqsOjnJ4MqdA2tpgsudZvdde3ZFA__",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
