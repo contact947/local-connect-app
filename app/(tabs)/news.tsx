@@ -37,32 +37,38 @@ export default function NewsScreen() {
         </View>
 
         {/* カテゴリフィルター */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="px-6 pb-4 h-12"
-          contentContainerStyle={{ gap: 8, alignItems: 'center' }}
-        >
-          {categories.map((category) => (
-            <TouchableOpacity
-              key={category.label}
-              className={`px-4 py-2 rounded-full border ${
-                selectedCategory === category.value
-                  ? "bg-primary border-primary"
-                  : "bg-surface border-border"
-              }`}
-              onPress={() => setSelectedCategory(category.value)}
-            >
-              <Text
-                className={`font-semibold ${
-                  selectedCategory === category.value ? "text-background" : "text-foreground"
+        <View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="flex-grow-0 py-2"
+            contentContainerStyle={{ 
+              gap: 8, 
+              alignItems: 'center',
+              paddingHorizontal: 24 // スクロール時に端まで表示されるようこちらに移動
+            }}
+          >
+            {categories.map((category) => (
+              <TouchableOpacity
+                key={category.label}
+                className={`px-4 py-2 rounded-full border ${
+                  selectedCategory === category.value
+                    ? "bg-primary border-primary"
+                    : "bg-surface border-border"
                 }`}
+                onPress={() => setSelectedCategory(category.value)}
               >
-                {category.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                <Text
+                  className={`font-semibold text-sm ${
+                    selectedCategory === category.value ? "text-background" : "text-foreground"
+                  }`}
+                >
+                  {category.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* 記事一覧 */}
         <ScrollView
