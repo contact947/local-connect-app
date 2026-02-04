@@ -40,8 +40,8 @@ export default function NewsScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          className="px-6 pb-4"
-          contentContainerStyle={{ gap: 8 }}
+          className="px-6 pb-4 h-12"
+          contentContainerStyle={{ gap: 8, alignItems: 'center' }}
         >
           {categories.map((category) => (
             <TouchableOpacity
