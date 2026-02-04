@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert, RefreshControl } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
 import { router } from "expo-router";
 import * as Location from "expo-location";
 
 export default function GiftsScreen() {
+  const colors = useColors();
   const { isAuthenticated } = useAuth();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -34,7 +37,7 @@ export default function GiftsScreen() {
     }
   }, [isAuthenticated]);
 
-  const { data: nearbyGifts, isLoading } = trpc.gifts.nearby.useQuery(
+  const { data: nearbyGifts, isLoading, refetch } = trpc.gifts.nearby.useQuery(
     {
       latitude: location?.latitude || 0,
       longitude: location?.longitude || 0,
@@ -45,16 +48,11 @@ export default function GiftsScreen() {
     }
   );
 
-  const handleGiftPress = async (giftId: number) => {
-    if (!isAuthenticated) {
-      Alert.alert("ログインが必要です", "ギフトを使用するにはログインしてください", [
-        { text: "キャンセル", style: "cancel" },
-        { text: "ログイン", onPress: () => router.push("/(tabs)/account") },
-      ]);
-      return;
-    }
-    // TODO: ギフト詳細画面へ遷移
-    Alert.alert("ギフト", `ギフトID: ${giftId}`);
+  // Pull to Refresh
+  const { refreshing, onRefresh } = usePullToRefresh(refetch);
+
+  const handleGiftPress = (giftId: number) => {
+    router.push(`/gifts/${giftId}`);
   };
 
   return (
@@ -89,7 +87,16 @@ export default function GiftsScreen() {
         )}
 
         {/* ギフト一覧 */}
-        <ScrollView className="flex-1 px-6">
+        <ScrollView
+          className="flex-1 px-6"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
+        >
           {isLoading ? (
             <View className="py-8 items-center">
               <ActivityIndicator size="large" />

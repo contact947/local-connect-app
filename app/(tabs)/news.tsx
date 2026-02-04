@@ -1,17 +1,23 @@
 import { useState } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
 
 export default function NewsScreen() {
+  const colors = useColors();
   const [selectedCategory, setSelectedCategory] = useState<
     "store" | "event" | "interview" | "column" | "other" | undefined
   >(undefined);
 
-  const { data: articles, isLoading } = trpc.articles.list.useQuery({
+  const { data: articles, isLoading, refetch } = trpc.articles.list.useQuery({
     category: selectedCategory,
     limit: 20,
   });
+
+  // Pull to Refresh
+  const { refreshing, onRefresh } = usePullToRefresh(refetch);
 
   const categories = [
     { value: undefined, label: "すべて" },
@@ -59,10 +65,19 @@ export default function NewsScreen() {
         </ScrollView>
 
         {/* 記事一覧 */}
-        <ScrollView className="flex-1 px-6">
-          {isLoading ? (
+        <ScrollView
+          className="flex-1 px-6"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
+        >
+          {isLoading && !articles ? (
             <View className="py-8 items-center">
-              <ActivityIndicator size="large" />
+              <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : articles && articles.length > 0 ? (
             <View className="gap-4 pb-6">

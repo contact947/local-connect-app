@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert, RefreshControl } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/use-auth";
 import { router } from "expo-router";
 
 export default function EventsScreen() {
+  const colors = useColors();
   const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<"upcoming" | "local">("upcoming");
 
@@ -20,7 +23,7 @@ export default function EventsScreen() {
     }
   );
 
-  const { data: localEvents, isLoading: eventsLoading } = trpc.events.list.useQuery(
+  const { data: localEvents, isLoading: eventsLoading, refetch: refetchEvents } = trpc.events.list.useQuery(
     {
       prefecture: profile?.prefecture || undefined,
       city: profile?.city || undefined,
@@ -31,16 +34,12 @@ export default function EventsScreen() {
     }
   );
 
+  // Pull to Refresh
+  const { refreshing: ticketsRefreshing, onRefresh: onRefreshTickets } = usePullToRefresh(refetchTickets);
+  const { refreshing: eventsRefreshing, onRefresh: onRefreshEvents } = usePullToRefresh(refetchEvents);
+
   const handleEventPress = (eventId: number) => {
-    if (!isAuthenticated) {
-      Alert.alert("ログインが必要です", "イベント詳細を見るにはログインしてください", [
-        { text: "キャンセル", style: "cancel" },
-        { text: "ログイン", onPress: () => router.push("/(tabs)/account") },
-      ]);
-      return;
-    }
-    // TODO: イベント詳細画面へ遷移
-    Alert.alert("イベント詳細", `イベントID: ${eventId}`);
+    router.push(`/events/${eventId}`);
   };
 
   return (
@@ -102,7 +101,16 @@ export default function EventsScreen() {
         )}
 
         {/* コンテンツ */}
-        <ScrollView className="flex-1 px-6">
+        <ScrollView
+          className="flex-1 px-6"
+          refreshControl={
+            <RefreshControl
+              refreshing={activeTab === "upcoming" ? ticketsRefreshing : eventsRefreshing}
+              onRefresh={activeTab === "upcoming" ? onRefreshTickets : onRefreshEvents}
+              tintColor={colors.primary}
+            />
+          }
+        >
           {activeTab === "upcoming" ? (
             ticketsLoading ? (
               <View className="py-8 items-center">
@@ -115,8 +123,10 @@ export default function EventsScreen() {
                     key={item.ticket.id}
                     className="bg-surface rounded-2xl overflow-hidden border border-border"
                     onPress={() => {
-                      // TODO: QRコード表示画面へ遷移
-                      Alert.alert("チケット", `QRコード: ${item.ticket.qrCode}`);
+                      // チケットQRコード表示
+                      Alert.alert("チケットQRコード", item.ticket.qrCode, [
+                        { text: "閉じる", style: "cancel" },
+                      ]);
                     }}
                   >
                     {item.event?.imageUrl && (
