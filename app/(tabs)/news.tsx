@@ -1,173 +1,141 @@
-import { useState } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, RefreshControl, FlatList, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/hooks/use-auth";
+import { router } from "expo-router";
+import { useState, useCallback } from "react";
+
+const categories = [
+  { label: "すべて", value: "all" as const },
+  { label: "グルメ", value: "store" as const },
+  { label: "イベント", value: "event" as const },
+  { label: "コラム", value: "column" as const },
+  { label: "インタビュー", value: "interview" as const },
+];
 
 export default function NewsScreen() {
-  const colors = useColors();
-  const [selectedCategory, setSelectedCategory] = useState<
-    "store" | "event" | "interview" | "column" | "other" | undefined
-  >(undefined);
+  const { isAuthenticated } = useAuth();
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data: articles, isLoading, refetch } = trpc.articles.list.useQuery({
-    category: selectedCategory,
-    limit: 20,
-  });
+  const { data: newsData = [], isLoading, refetch } = trpc.articles.list.useQuery(
+    {
+      category: selectedCategory === "all" ? undefined : (selectedCategory as "event" | "interview" | "other" | "store" | "column"),
+    },
+    {
+      enabled: isAuthenticated,
+    }
+  );
 
-  // Pull to Refresh
-  const { refreshing, onRefresh } = usePullToRefresh(refetch);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
-  const categories = [
-    { value: undefined, label: "すべて" },
-    { value: "store" as const, label: "店舗" },
-    { value: "event" as const, label: "イベント" },
-    { value: "interview" as const, label: "インタビュー" },
-    { value: "column" as const, label: "コラム" },
-  ];
+  if (!isAuthenticated) {
+    return (
+      <ScreenContainer className="justify-center items-center p-6">
+        <Text className="text-2xl font-bold text-foreground mb-4">ニュース</Text>
+        <Text className="text-muted text-center mb-6">ログインしてニュースを読みましょう</Text>
+        <TouchableOpacity
+          className="bg-primary px-8 py-3 rounded-full"
+          onPress={() => router.push('/auth/welcome')}
+        >
+          <Text className="text-background font-semibold">ログイン</Text>
+        </TouchableOpacity>
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
-      <View className="flex-1">
-        {/* ヘッダー */}
-        <View className="p-6 pb-4">
-          <Text className="text-3xl font-bold text-foreground">ニュース</Text>
-          <Text className="text-muted mt-1">全国の最新情報</Text>
-        </View>
-
-        {/* カテゴリフィルター */}
-<<<<<<< Updated upstream
-        <View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            className="flex-grow-0 py-2"
-            contentContainerStyle={{ 
-              gap: 8, 
-              alignItems: 'center',
-              paddingHorizontal: 24 // スクロール時に端まで表示されるようこちらに移動
-            }}
-          >
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category.label}
-                className={`px-4 py-2 rounded-full border ${
-                  selectedCategory === category.value
-                    ? "bg-primary border-primary"
-                    : "bg-surface border-border"
-=======
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="px-6 py-2"
-          contentContainerStyle={{ gap: 8, alignItems: 'center' }}
-        >
-          {categories.map((category) => (
-            <TouchableOpacity
-              key={category.label}
-              className={`px-4 py-2 rounded-full border ${
-                selectedCategory === category.value
-                  ? "bg-primary border-primary"
-                  : "bg-surface border-border"
-              }`}
-              onPress={() => setSelectedCategory(category.value)}
-            >
-              <Text
-                className={`font-semibold ${
-                  selectedCategory === category.value ? "text-background" : "text-foreground"
->>>>>>> Stashed changes
-                }`}
-                onPress={() => setSelectedCategory(category.value)}
-              >
-                <Text
-                  className={`font-semibold text-sm ${
-                    selectedCategory === category.value ? "text-background" : "text-foreground"
-                  }`}
-                >
-                  {category.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* 記事一覧 */}
-        <ScrollView
-          className="flex-1 px-6"
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.primary}
-            />
-          }
-        >
-          {isLoading && !articles ? (
-            <View className="py-8 items-center">
-              <ActivityIndicator size="large" color={colors.primary} />
+      <FlatList
+        data={newsData}
+        keyExtractor={(item) => item.id.toString()}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListHeaderComponent={
+          <View className="px-6 pb-4">
+            {/* ヘッダー */}
+            <View className="mb-4">
+              <Text className="text-3xl font-bold text-foreground">ニュース</Text>
+              <Text className="text-muted mt-1">全国の最新情報</Text>
             </View>
-          ) : articles && articles.length > 0 ? (
-            <View className="gap-4 pb-6">
-              {articles.map((article) => (
+
+            {/* カテゴリフィルター */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="py-2"
+              contentContainerStyle={{ gap: 8, alignItems: 'center', paddingHorizontal: 0 }}
+            >
+              {categories.map((category) => (
                 <TouchableOpacity
-                  key={article.id}
-                  className="bg-surface rounded-2xl overflow-hidden border border-border"
+                  key={category.label}
+                  className={`px-4 py-2 rounded-full border ${
+                    selectedCategory === category.value
+                      ? "bg-primary border-primary"
+                      : "bg-surface border-border"
+                  }`}
+                  onPress={() => setSelectedCategory(category.value)}
                 >
-                  {article.imageUrl && (
-                    <Image
-                      source={{ uri: article.imageUrl }}
-                      className="w-full h-48"
-                      resizeMode="cover"
-                    />
-                  )}
-                  <View className="p-4">
-                    <View className="flex-row items-center mb-2">
-                      <View className="bg-primary px-3 py-1 rounded-full mr-2">
-                        <Text className="text-background text-xs font-semibold">
-                          {article.category === "store"
-                            ? "店舗"
-                            : article.category === "event"
-                              ? "イベント"
-                              : article.category === "interview"
-                                ? "インタビュー"
-                                : article.category === "column"
-                                  ? "コラム"
-                                  : "その他"}
-                        </Text>
-                      </View>
-                      {article.prefecture && (
-                        <View className="bg-surface border border-border px-3 py-1 rounded-full mr-2">
-                          <Text className="text-foreground text-xs">
-                            {article.prefecture}
-                            {article.city}
-                          </Text>
-                        </View>
-                      )}
-                      <Text className="text-muted text-xs">
-                        {new Date(article.publishedAt).toLocaleDateString("ja-JP")}
-                      </Text>
-                    </View>
-                    <Text className="text-foreground font-bold text-lg mb-2" numberOfLines={2}>
-                      {article.title}
-                    </Text>
-                    <Text className="text-muted text-sm" numberOfLines={3}>
-                      {article.content}
-                    </Text>
-                    <View className="flex-row items-center mt-3">
-                      <Text className="text-muted text-xs">{article.viewCount} 回閲覧</Text>
-                    </View>
-                  </View>
+                  <Text
+                    className={`font-semibold text-sm ${
+                      selectedCategory === category.value ? "text-background" : "text-foreground"
+                    }`}
+                  >
+                    {category.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
+            </ScrollView>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            onPress={() => router.push(`/news/${item.id}` as any)}
+            className="mx-6 mb-4 bg-surface rounded-2xl overflow-hidden border border-border active:opacity-80"
+          >
+            <View className="flex-row">
+              {item.imageUrl && (
+                <View className="w-24 h-24 bg-muted">
+                  <Text className="text-xs text-muted p-2">画像</Text>
+                </View>
+              )}
+              <View className="flex-1 p-3 justify-between">
+                <View>
+                  <Text className="text-xs text-primary font-semibold mb-1">
+                    {item.category}
+                  </Text>
+                  <Text className="text-sm font-bold text-foreground line-clamp-2">
+                    {item.title}
+                  </Text>
+                </View>
+                <Text className="text-xs text-muted">
+                  {new Date(item.createdAt).toLocaleDateString("ja-JP")}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={
+          isLoading ? (
+            <View className="items-center justify-center py-8">
+              <ActivityIndicator size="large" />
             </View>
           ) : (
-            <View className="py-8 items-center">
-              <Text className="text-muted">ニュースがまだありません</Text>
+            <View className="items-center justify-center py-8">
+              <Text className="text-muted">ニュースがありません</Text>
             </View>
-          )}
-        </ScrollView>
-      </View>
+          )
+        }
+        contentContainerStyle={{ paddingBottom: 16 }}
+      />
     </ScreenContainer>
   );
 }
