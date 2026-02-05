@@ -37,6 +37,7 @@ export default function NewsScreen() {
         </View>
 
         {/* カテゴリフィルター */}
+<<<<<<< Updated upstream
         <View>
           <ScrollView
             horizontal
@@ -55,6 +56,27 @@ export default function NewsScreen() {
                   selectedCategory === category.value
                     ? "bg-primary border-primary"
                     : "bg-surface border-border"
+=======
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="px-6 py-2"
+          contentContainerStyle={{ gap: 8, alignItems: 'center' }}
+        >
+          {categories.map((category) => (
+            <TouchableOpacity
+              key={category.label}
+              className={`px-4 py-2 rounded-full border ${
+                selectedCategory === category.value
+                  ? "bg-primary border-primary"
+                  : "bg-surface border-border"
+              }`}
+              onPress={() => setSelectedCategory(category.value)}
+            >
+              <Text
+                className={`font-semibold ${
+                  selectedCategory === category.value ? "text-background" : "text-foreground"
+>>>>>>> Stashed changes
                 }`}
                 onPress={() => setSelectedCategory(category.value)}
               >

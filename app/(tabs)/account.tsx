@@ -103,7 +103,7 @@ export default function AccountScreen() {
         <Text className="text-muted text-center mb-6">ログインしてプロフィールを管理しましょう</Text>
         <TouchableOpacity
           className="bg-primary px-8 py-3 rounded-full"
-          onPress={() => startOAuthLogin()}
+          onPress={() => router.push('/auth/welcome')}
         >
           <Text className="text-background font-semibold">ログイン</Text>
         </TouchableOpacity>
