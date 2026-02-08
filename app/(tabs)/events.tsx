@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert, RefreshControl, Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
@@ -6,15 +6,14 @@ import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
 import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { router } from "expo-router";
-import { extractPrefectureFromAddress } from "@/types/prefecture";
 
-type EventSegment = "region" | "national";
+type EventSegment = "national" | "region";
 type EventTab = "upcoming" | "list";
 
 export default function EventsScreen() {
   const colors = useColors();
   const { user, profile } = useFirebaseAuthContext();
-  const [segment, setSegment] = useState<EventSegment>("region");
+  const [segment, setSegment] = useState<EventSegment>("national");
   const [activeTab, setActiveTab] = useState<EventTab>("upcoming");
 
   // 参加予定チケット取得
@@ -26,65 +25,39 @@ export default function EventsScreen() {
   );
 
   // 全国のイベント取得
-  const { data: allEvents, isLoading: allEventsLoading, refetch: refetchAllEvents } = trpc.events.list.useQuery(
+  const { data: nationalEvents, isLoading: nationalLoading, refetch: refetchNationalEvents } = trpc.events.list.useQuery(
     {
-      limit: 50,
+      limit: 20,
     },
     {
-      enabled: !!user && activeTab === "list",
+      enabled: !!user && segment === "national" && activeTab === "list",
+    }
+  );
+
+  // 地域のイベント取得
+  const { data: regionEvents, isLoading: regionLoading, refetch: refetchRegionEvents } = trpc.events.list.useQuery(
+    {
+      prefecture: profile?.address?.split(" ")[0] || undefined,
+      limit: 20,
+    },
+    {
+      enabled: !!user && segment === "region" && activeTab === "list" && !!profile?.address,
     }
   );
 
   // Pull to Refresh
   const { refreshing: ticketsRefreshing, onRefresh: onRefreshTickets } = usePullToRefresh(refetchTickets);
-  const { refreshing: allEventsRefreshing, onRefresh: onRefreshAllEvents } = usePullToRefresh(refetchAllEvents);
-
-  // ユーザーの登録県を取得
-  const userPrefecture = useMemo(() => {
-    if (!profile?.address) return null;
-    return extractPrefectureFromAddress(profile.address) || null;
-  }, [profile?.address]);
-
-  // セグメント別にイベントをフィルタリングしてソート
-  const filteredAndSortedEvents = useMemo(() => {
-    if (!allEvents) return [];
-
-    // 現在日時を取得
-    const now = new Date();
-
-    // セグメント別にフィルタリング
-    let filtered = allEvents;
-    if (segment === "region" && userPrefecture) {
-      filtered = allEvents.filter((event) => {
-        const eventPrefecture = extractPrefectureFromAddress(event.venue) || "";
-        return eventPrefecture === userPrefecture;
-      });
-    }
-
-    // 開催日が現在から近い順でソート
-    return filtered.sort((a, b) => {
-      const dateA = new Date(a.eventDate).getTime();
-      const dateB = new Date(b.eventDate).getTime();
-
-      // 過去のイベントは後ろに
-      const aIsPast = dateA < now.getTime();
-      const bIsPast = dateB < now.getTime();
-
-      if (aIsPast && !bIsPast) return 1;
-      if (!aIsPast && bIsPast) return -1;
-
-      // 同じカテゴリ（過去/未来）内では日付が近い順
-      return Math.abs(dateA - now.getTime()) - Math.abs(dateB - now.getTime());
-    });
-  }, [allEvents, segment, userPrefecture]);
+  const { refreshing: nationalRefreshing, onRefresh: onRefreshNational } = usePullToRefresh(refetchNationalEvents);
+  const { refreshing: regionRefreshing, onRefresh: onRefreshRegion } = usePullToRefresh(refetchRegionEvents);
 
   const handleEventPress = (eventId: number) => {
     router.push(`/events/${eventId}`);
   };
 
-  const isLoading = activeTab === "upcoming" ? ticketsLoading : allEventsLoading;
-  const refreshing = activeTab === "upcoming" ? ticketsRefreshing : allEventsRefreshing;
-  const onRefresh = activeTab === "upcoming" ? onRefreshTickets : onRefreshAllEvents;
+  const eventData = segment === "national" ? nationalEvents : regionEvents;
+  const isLoading = segment === "national" ? nationalLoading : regionLoading;
+  const refreshing = segment === "national" ? nationalRefreshing : regionRefreshing;
+  const onRefresh = segment === "national" ? onRefreshNational : onRefreshRegion;
 
   return (
     <ScreenContainer>
@@ -93,7 +66,7 @@ export default function EventsScreen() {
         <View className="p-6 pb-4">
           <Text className="text-3xl font-bold text-foreground">イベント</Text>
           <Text className="text-muted mt-1">
-            {activeTab === "upcoming" ? "参加予定のイベント" : (segment === "region" ? "地域のイベント" : "全国のイベント")}
+            {activeTab === "upcoming" ? "参加予定のイベント" : (segment === "national" ? "全国のイベント" : "地域のイベント")}
           </Text>
         </View>
 
@@ -146,25 +119,9 @@ export default function EventsScreen() {
           </View>
         )}
 
-        {/* セグメント切り替え（地域 / 全国） - イベント一覧タブのみ表示 */}
+        {/* セグメント切り替え（全国 / 地域） - イベント一覧タブのみ表示 */}
         {user && activeTab === "list" && (
           <View className="px-6 pb-4 flex-row gap-2">
-            <Pressable
-              onPress={() => setSegment("region")}
-              className={`flex-1 py-2 px-4 rounded-lg border ${
-                segment === "region"
-                  ? "bg-primary border-primary"
-                  : "bg-surface border-border"
-              }`}
-            >
-              <Text
-                className={`text-center font-semibold text-sm ${
-                  segment === "region" ? "text-background" : "text-foreground"
-                }`}
-              >
-                地域のイベント
-              </Text>
-            </Pressable>
             <Pressable
               onPress={() => setSegment("national")}
               className={`flex-1 py-2 px-4 rounded-lg border ${
@@ -178,7 +135,23 @@ export default function EventsScreen() {
                   segment === "national" ? "text-background" : "text-foreground"
                 }`}
               >
-                全国のイベント
+                全国
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setSegment("region")}
+              className={`flex-1 py-2 px-4 rounded-lg border ${
+                segment === "region"
+                  ? "bg-primary border-primary"
+                  : "bg-surface border-border"
+              }`}
+            >
+              <Text
+                className={`text-center font-semibold text-sm ${
+                  segment === "region" ? "text-background" : "text-foreground"
+                }`}
+              >
+                地域
               </Text>
             </Pressable>
           </View>
@@ -189,8 +162,8 @@ export default function EventsScreen() {
           className="flex-1 px-6"
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
+              refreshing={activeTab === "upcoming" ? ticketsRefreshing : refreshing}
+              onRefresh={activeTab === "upcoming" ? onRefreshTickets : onRefresh}
               tintColor={colors.primary}
             />
           }
@@ -264,9 +237,9 @@ export default function EventsScreen() {
             <View className="py-8 items-center">
               <ActivityIndicator size="large" />
             </View>
-          ) : filteredAndSortedEvents.length > 0 ? (
+          ) : eventData && eventData.length > 0 ? (
             <View className="gap-4 pb-6">
-              {filteredAndSortedEvents.map((event) => (
+              {eventData.map((event) => (
                 <TouchableOpacity
                   key={event.id}
                   className="bg-surface rounded-2xl overflow-hidden border border-border"
@@ -309,7 +282,7 @@ export default function EventsScreen() {
           ) : (
             <View className="py-8 items-center">
               <Text className="text-muted">
-                {segment === "region" ? "地域のイベント" : "全国のイベント"}がまだありません
+                {segment === "national" ? "全国のイベント" : "地域のイベント"}がまだありません
               </Text>
             </View>
           )}
