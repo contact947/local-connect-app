@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
-import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
+import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator, Alert, Share, Modal, FlatList, TouchableOpacity } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { router } from "expo-router";
 import { getUserProfileFromFirestore, updateUserProfileInFirestore } from "@/lib/firestore-utils";
+import prefecturesData from "@/constants/prefectures.json";
+import { extractPrefectureFromAddress, getCitiesByPrefectureName } from "@/types/prefecture";
+import * as Clipboard from "expo-clipboard";
 
 export default function AccountScreen() {
   const { user, loading: authLoading, logout } = useFirebaseAuthContext();
@@ -15,9 +18,13 @@ export default function AccountScreen() {
     name: "",
     age: "",
     gender: "prefer_not_to_say",
-    address: "",
+    prefecture: "",
+    city: "",
     occupation: "",
   });
+  const [showPrefectureModal, setShowPrefectureModal] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
+  const [availableCities, setAvailableCities] = useState<any[]>([]);
 
   // プロフィール取得
   useEffect(() => {
@@ -30,11 +37,17 @@ export default function AccountScreen() {
         const data = await getUserProfileFromFirestore(user.uid);
         setProfile(data);
         if (data) {
+          // 住所から都道府県と市区町村を抽出
+          const address = data.address || "";
+          const prefecture = extractPrefectureFromAddress(address) || "";
+          const city = address.replace(prefecture, "").trim() || "";
+
           setFormData({
             name: data.name || "",
             age: data.age?.toString() || "",
             gender: data.gender || "prefer_not_to_say",
-            address: data.address || "",
+            prefecture: prefecture,
+            city: city,
             occupation: data.occupation || "",
           });
         }
@@ -48,16 +61,77 @@ export default function AccountScreen() {
     fetchProfile();
   }, [user]);
 
+  // 都道府県選択時に市区町村を更新
+  useEffect(() => {
+    if (formData.prefecture) {
+      const cities = getCitiesByPrefectureName(prefecturesData.prefectures, formData.prefecture);
+      setAvailableCities(cities);
+      setFormData((prev) => ({ ...prev, city: "" }));
+    }
+  }, [formData.prefecture]);
+
+  const handleCopyToClipboard = async (text: string) => {
+    await Clipboard.setStringAsync(text);
+    Alert.alert("コピーしました", "クリップボードにコピーされました");
+  };
+
+  const handleSaveWithConfirmation = () => {
+    Alert.alert(
+      "プロフィール更新",
+      "変更内容を保存しますか？",
+      [
+        { text: "キャンセル", style: "cancel" },
+        {
+          text: "保存",
+          style: "default",
+          onPress: handleSave,
+        },
+      ]
+    );
+  };
+
+  const handleCancelWithConfirmation = () => {
+    Alert.alert(
+      "編集キャンセル",
+      "変更内容を破棄しますか？",
+      [
+        { text: "続ける", style: "cancel" },
+        {
+          text: "破棄",
+          style: "destructive",
+          onPress: () => {
+            setIsEditing(false);
+            if (profile) {
+              const address = profile.address || "";
+              const prefecture = extractPrefectureFromAddress(address) || "";
+              const city = address.replace(prefecture, "").trim() || "";
+
+              setFormData({
+                name: profile.name || "",
+                age: profile.age?.toString() || "",
+                gender: profile.gender || "prefer_not_to_say",
+                prefecture: prefecture,
+                city: city,
+                occupation: profile.occupation || "",
+              });
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSave = async () => {
     if (!user) return;
 
     setIsSaving(true);
     try {
+      const fullAddress = `${formData.prefecture}${formData.city}`;
       await updateUserProfileInFirestore(user.uid, {
         name: formData.name,
         age: formData.age ? parseInt(formData.age) : undefined,
         gender: formData.gender as "male" | "female" | "other" | "prefer_not_to_say",
-        address: formData.address,
+        address: fullAddress,
         occupation: formData.occupation,
       });
 
@@ -127,17 +201,25 @@ export default function AccountScreen() {
 
           {/* ユーザー基本情報（表示のみ） */}
           <View className="gap-4">
-            {/* アカウントID */}
-            <View className="bg-surface rounded-lg p-4 border border-border">
+            {/* アカウントID - 長押しでコピー */}
+            <Pressable
+              onLongPress={() => handleCopyToClipboard(user.uid)}
+              className="bg-surface rounded-lg p-4 border border-border active:opacity-70"
+            >
               <Text className="text-xs text-muted mb-1">アカウントID</Text>
               <Text className="text-base text-foreground font-mono">{user.uid}</Text>
-            </View>
+              <Text className="text-xs text-muted mt-2">長押しでコピー</Text>
+            </Pressable>
 
-            {/* メールアドレス */}
-            <View className="bg-surface rounded-lg p-4 border border-border">
+            {/* メールアドレス - 長押しでコピー */}
+            <Pressable
+              onLongPress={() => handleCopyToClipboard(user.email || "")}
+              className="bg-surface rounded-lg p-4 border border-border active:opacity-70"
+            >
               <Text className="text-xs text-muted mb-1">メールアドレス</Text>
               <Text className="text-base text-foreground">{user.email}</Text>
-            </View>
+              <Text className="text-xs text-muted mt-2">長押しでコピー</Text>
+            </Pressable>
           </View>
 
           {/* プロフィール情報 */}
@@ -180,7 +262,7 @@ export default function AccountScreen() {
                   />
                 </View>
 
-                {/* 性別 */}
+                {/* 性別 - ボタン選択式 */}
                 <View className="gap-2">
                   <Text className="text-sm text-muted font-semibold">性別</Text>
                   <View className="flex-row gap-2">
@@ -188,7 +270,6 @@ export default function AccountScreen() {
                       { value: "male", label: "男性" },
                       { value: "female", label: "女性" },
                       { value: "other", label: "その他" },
-                      { value: "prefer_not_to_say", label: "回答しない" },
                     ].map((option) => (
                       <Pressable
                         key={option.value}
@@ -201,7 +282,7 @@ export default function AccountScreen() {
                         }`}
                       >
                         <Text
-                          className={`text-center text-xs font-semibold ${
+                          className={`text-center text-sm font-semibold ${
                             formData.gender === option.value ? "text-white" : "text-foreground"
                           }`}
                         >
@@ -212,17 +293,36 @@ export default function AccountScreen() {
                   </View>
                 </View>
 
-                {/* 住所 */}
+                {/* 都道府県 - プルダウン */}
                 <View className="gap-2">
-                  <Text className="text-sm text-muted font-semibold">住所</Text>
-                  <TextInput
-                    placeholder="東京都渋谷区"
-                    value={formData.address}
-                    onChangeText={(text) => setFormData({ ...formData, address: text })}
-                    className="bg-surface rounded-lg p-3 text-foreground border border-border"
-                    placeholderTextColor="#999"
-                    editable={!isSaving}
-                  />
+                  <Text className="text-sm text-muted font-semibold">都道府県</Text>
+                  <Pressable
+                    onPress={() => setShowPrefectureModal(true)}
+                    disabled={isSaving}
+                    className="bg-surface rounded-lg p-3 border border-border flex-row justify-between items-center"
+                  >
+                    <Text className={formData.prefecture ? "text-foreground" : "text-muted"}>
+                      {formData.prefecture || "選択してください"}
+                    </Text>
+                    <Text className="text-foreground">▼</Text>
+                  </Pressable>
+                </View>
+
+                {/* 市区町村 - プルダウン */}
+                <View className="gap-2">
+                  <Text className="text-sm text-muted font-semibold">市区町村</Text>
+                  <Pressable
+                    onPress={() => setShowCityModal(true)}
+                    disabled={isSaving || !formData.prefecture}
+                    className={`bg-surface rounded-lg p-3 border flex-row justify-between items-center ${
+                      formData.prefecture ? "border-border" : "border-border opacity-50"
+                    }`}
+                  >
+                    <Text className={formData.city ? "text-foreground" : "text-muted"}>
+                      {formData.city || "都道府県を選択してください"}
+                    </Text>
+                    <Text className="text-foreground">▼</Text>
+                  </Pressable>
                 </View>
 
                 {/* 職業 */}
@@ -241,25 +341,14 @@ export default function AccountScreen() {
                 {/* ボタン */}
                 <View className="flex-row gap-3 mt-2">
                   <Pressable
-                    onPress={() => {
-                      setIsEditing(false);
-                      if (profile) {
-                        setFormData({
-                          name: profile.name || "",
-                          age: profile.age?.toString() || "",
-                          gender: profile.gender || "prefer_not_to_say",
-                          address: profile.address || "",
-                          occupation: profile.occupation || "",
-                        });
-                      }
-                    }}
+                    onPress={handleCancelWithConfirmation}
                     disabled={isSaving}
                     className="flex-1 bg-surface py-3 rounded-lg border border-border active:opacity-70"
                   >
                     <Text className="text-center font-semibold text-foreground">キャンセル</Text>
                   </Pressable>
                   <Pressable
-                    onPress={handleSave}
+                    onPress={handleSaveWithConfirmation}
                     disabled={isSaving}
                     className="flex-1 bg-primary py-3 rounded-lg active:opacity-70"
                   >
@@ -295,7 +384,7 @@ export default function AccountScreen() {
                         ? "女性"
                         : profile?.gender === "other"
                           ? "その他"
-                          : "回答しない"}
+                          : "未設定"}
                   </Text>
                 </View>
 
@@ -325,6 +414,64 @@ export default function AccountScreen() {
           <View className="h-8" />
         </View>
       </ScrollView>
+
+      {/* 都道府県選択モーダル */}
+      <Modal
+        visible={showPrefectureModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPrefectureModal(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-background rounded-t-3xl p-6 max-h-3/4">
+            <Text className="text-lg font-bold text-foreground mb-4">都道府県を選択</Text>
+            <FlatList
+              data={prefecturesData.prefectures}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => {
+                    setFormData({ ...formData, prefecture: item.name });
+                    setShowPrefectureModal(false);
+                  }}
+                  className="py-3 border-b border-border"
+                >
+                  <Text className="text-foreground">{item.name}</Text>
+                </Pressable>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* 市区町村選択モーダル */}
+      <Modal
+        visible={showCityModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCityModal(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-background rounded-t-3xl p-6 max-h-3/4">
+            <Text className="text-lg font-bold text-foreground mb-4">市区町村を選択</Text>
+            <FlatList
+              data={availableCities}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => {
+                    setFormData({ ...formData, city: item.name });
+                    setShowCityModal(false);
+                  }}
+                  className="py-3 border-b border-border"
+                >
+                  <Text className="text-foreground">{item.name}</Text>
+                </Pressable>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }

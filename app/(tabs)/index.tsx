@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, FlatList, ActivityIndicator, RefreshControl, Pressable } from "react-native";
+import { ScrollView, Text, View, FlatList, ActivityIndicator, RefreshControl, Pressable, Image } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { useInitialRoute } from "@/hooks/use-initial-route";
@@ -96,12 +96,34 @@ export default function HomeScreen() {
                 renderItem={({ item }) => (
                   <Pressable
                     onPress={() => router.push(`/news/${item.id}` as any)}
-                    className="bg-surface rounded-lg p-3 mb-2 active:opacity-70"
+                    className="bg-surface rounded-2xl overflow-hidden border border-border mb-3 active:opacity-80"
                   >
-                    <Text className="text-foreground font-semibold text-sm" numberOfLines={2}>
-                      {item.title}
-                    </Text>
-                    <Text className="text-muted text-xs mt-1">{item.category}</Text>
+                    <View className="flex-row">
+                      {item.imageUrl ? (
+                        <Image
+                          source={{ uri: item.imageUrl }}
+                          className="w-24 h-24 bg-muted"
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View className="w-24 h-24 bg-muted items-center justify-center">
+                          <Text className="text-xs text-muted">画像</Text>
+                        </View>
+                      )}
+                      <View className="flex-1 p-3 justify-between">
+                        <View>
+                          <Text className="text-xs text-primary font-semibold mb-1">
+                            {item.category}
+                          </Text>
+                          <Text className="text-sm font-bold text-foreground line-clamp-2">
+                            {item.title}
+                          </Text>
+                        </View>
+                        <Text className="text-xs text-muted">
+                          {new Date(item.createdAt).toLocaleDateString("ja-JP")}
+                        </Text>
+                      </View>
+                    </View>
                   </Pressable>
                 )}
               />
@@ -126,12 +148,38 @@ export default function HomeScreen() {
                 renderItem={({ item }) => (
                   <Pressable
                     onPress={() => router.push(`/events/${item.id}` as any)}
-                    className="bg-surface rounded-lg p-3 mb-2 active:opacity-70"
+                    className="bg-surface rounded-2xl overflow-hidden border border-border mb-3 active:opacity-80"
                   >
-                    <Text className="text-foreground font-semibold text-sm" numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                    <Text className="text-muted text-xs mt-1">{new Date(item.eventDate).toLocaleDateString()}</Text>
+                    {item.imageUrl ? (
+                      <Image
+                        source={{ uri: item.imageUrl }}
+                        className="w-full h-40 bg-muted"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View className="w-full h-40 bg-muted items-center justify-center">
+                        <Text className="text-xs text-muted">画像</Text>
+                      </View>
+                    )}
+                    <View className="p-3">
+                      <Text className="text-foreground font-bold text-sm mb-2" numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      <View className="gap-1">
+                        <View className="flex-row items-center">
+                          <Text className="text-muted text-xs mr-2">📅</Text>
+                          <Text className="text-muted text-xs">
+                            {new Date(item.eventDate).toLocaleDateString("ja-JP")}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-center">
+                          <Text className="text-muted text-xs mr-2">📍</Text>
+                          <Text className="text-muted text-xs" numberOfLines={1}>
+                            {item.venue}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
                   </Pressable>
                 )}
               />
@@ -154,12 +202,34 @@ export default function HomeScreen() {
                 renderItem={({ item }) => (
                   <Pressable
                     onPress={() => router.push(`/news/${item.id}` as any)}
-                    className="bg-surface rounded-lg p-3 mb-2 active:opacity-70"
+                    className="bg-surface rounded-2xl overflow-hidden border border-border mb-3 active:opacity-80"
                   >
-                    <Text className="text-foreground font-semibold text-sm" numberOfLines={2}>
-                      {item.title}
-                    </Text>
-                    <Text className="text-muted text-xs mt-1">{item.category}</Text>
+                    <View className="flex-row">
+                      {item.imageUrl ? (
+                        <Image
+                          source={{ uri: item.imageUrl }}
+                          className="w-24 h-24 bg-muted"
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View className="w-24 h-24 bg-muted items-center justify-center">
+                          <Text className="text-xs text-muted">画像</Text>
+                        </View>
+                      )}
+                      <View className="flex-1 p-3 justify-between">
+                        <View>
+                          <Text className="text-xs text-primary font-semibold mb-1">
+                            {item.category}
+                          </Text>
+                          <Text className="text-sm font-bold text-foreground line-clamp-2">
+                            {item.title}
+                          </Text>
+                        </View>
+                        <Text className="text-xs text-muted">
+                          {new Date(item.createdAt).toLocaleDateString("ja-JP")}
+                        </Text>
+                      </View>
+                    </View>
                   </Pressable>
                 )}
               />
@@ -182,12 +252,38 @@ export default function HomeScreen() {
                 renderItem={({ item }) => (
                   <Pressable
                     onPress={() => router.push(`/events/${item.id}` as any)}
-                    className="bg-surface rounded-lg p-3 mb-2 active:opacity-70"
+                    className="bg-surface rounded-2xl overflow-hidden border border-border mb-3 active:opacity-80"
                   >
-                    <Text className="text-foreground font-semibold text-sm" numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                    <Text className="text-muted text-xs mt-1">{new Date(item.eventDate).toLocaleDateString()}</Text>
+                    {item.imageUrl ? (
+                      <Image
+                        source={{ uri: item.imageUrl }}
+                        className="w-full h-40 bg-muted"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View className="w-full h-40 bg-muted items-center justify-center">
+                        <Text className="text-xs text-muted">画像</Text>
+                      </View>
+                    )}
+                    <View className="p-3">
+                      <Text className="text-foreground font-bold text-sm mb-2" numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      <View className="gap-1">
+                        <View className="flex-row items-center">
+                          <Text className="text-muted text-xs mr-2">📅</Text>
+                          <Text className="text-muted text-xs">
+                            {new Date(item.eventDate).toLocaleDateString("ja-JP")}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-center">
+                          <Text className="text-muted text-xs mr-2">📍</Text>
+                          <Text className="text-muted text-xs" numberOfLines={1}>
+                            {item.venue}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
                   </Pressable>
                 )}
               />
