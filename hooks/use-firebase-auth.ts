@@ -6,9 +6,8 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import * as SecureStore from "expo-secure-store";
 
 export interface UserProfile {
   uid: string;
@@ -17,7 +16,10 @@ export interface UserProfile {
   age: number | null;
   gender: string | null;
   address: string | null;
+  prefecture: string | null;
+  city: string | null;
   occupation: string | null;
+  schoolType: string | null;
   role: "admin" | "planner" | "user";
   createdAt: Date;
   updatedAt: Date;
@@ -49,23 +51,30 @@ export function useFirebaseAuth() {
               age: userData.age || null,
               gender: userData.gender || null,
               address: userData.address || null,
+              prefecture: userData.prefecture || null,
+              city: userData.city || null,
               occupation: userData.occupation || null,
+              schoolType: userData.schoolType || null,
               role: (userData.role || "user") as "admin" | "planner" | "user",
               createdAt: userData.createdAt?.toDate() || new Date(),
               updatedAt: userData.updatedAt?.toDate() || new Date(),
             });
           } else {
             // 新規ユーザーの場合、デフォルトプロフィールを作成
+            const now = Timestamp.now();
             const defaultProfile = {
               email: firebaseUser.email,
               name: null,
               age: null,
               gender: null,
               address: null,
+              prefecture: null,
+              city: null,
               occupation: null,
+              schoolType: null,
               role: "user",
-              createdAt: new Date(),
-              updatedAt: new Date(),
+              createdAt: now,
+              updatedAt: now,
             };
             await setDoc(userDocRef, defaultProfile);
             setUser({
@@ -75,7 +84,10 @@ export function useFirebaseAuth() {
               age: null,
               gender: null,
               address: null,
+              prefecture: null,
+              city: null,
               occupation: null,
+              schoolType: null,
               role: "user" as const,
               createdAt: new Date(),
               updatedAt: new Date(),
@@ -104,16 +116,20 @@ export function useFirebaseAuth() {
 
         // Firestoreにユーザープロフィールを作成
         const userDocRef = doc(db, "users", result.user.uid);
+        const now = Timestamp.now();
         await setDoc(userDocRef, {
           email,
           name,
           age: null,
           gender: null,
           address: null,
+          prefecture: null,
+          city: null,
           occupation: null,
+          schoolType: null,
           role: "user",
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: now,
+          updatedAt: now,
         });
 
         return result.user;
@@ -161,11 +177,12 @@ export function useFirebaseAuth() {
       try {
         setError(null);
         const userDocRef = doc(db, "users", firebaseUser.uid);
+        const now = Timestamp.now();
         await setDoc(
           userDocRef,
           {
             ...updates,
-            updatedAt: new Date(),
+            updatedAt: now,
           },
           { merge: true }
         );

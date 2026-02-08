@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
+import { ScrollView, Text, View, Pressable, TextInput, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider";
 import { router } from "expo-router";
@@ -16,31 +16,30 @@ export default function SignUpScreen() {
     setLocalError(null);
 
     // バリデーション
+    if (!name.trim()) {
+      setLocalError("氏名を入力してください");
+      return;
+    }
     if (!email.trim()) {
       setLocalError("メールアドレスを入力してください");
       return;
     }
-    if (!password.trim()) {
-      setLocalError("パスワードを入力してください");
+    if (!email.includes("@")) {
+      setLocalError("有効なメールアドレスを入力してください");
+      return;
+    }
+    if (password.length < 6) {
+      setLocalError("パスワードは6文字以上で設定してください");
       return;
     }
     if (password !== confirmPassword) {
       setLocalError("パスワードが一致しません");
       return;
     }
-    if (password.length < 6) {
-      setLocalError("パスワードは6文字以上である必要があります");
-      return;
-    }
-    if (!name.trim()) {
-      setLocalError("氏名を入力してください");
-      return;
-    }
 
     try {
       await signUp(email, password, name);
-      Alert.alert("成功", "アカウントを作成しました");
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as any);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "登録に失敗しました";
       setLocalError(errorMessage);
@@ -67,81 +66,81 @@ export default function SignUpScreen() {
           {/* フォーム */}
           <View className="gap-4">
             {/* 氏名 */}
-            <View>
-              <Text className="text-foreground font-semibold mb-2">氏名</Text>
+            <View className="gap-2">
+              <Text className="text-foreground font-semibold">氏名</Text>
               <TextInput
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
                 placeholder="山田太郎"
-                placeholderTextColor="#999"
                 value={name}
                 onChangeText={setName}
                 editable={!loading}
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                placeholderTextColor="#999"
               />
             </View>
 
             {/* メールアドレス */}
-            <View>
-              <Text className="text-foreground font-semibold mb-2">メールアドレス</Text>
+            <View className="gap-2">
+              <Text className="text-foreground font-semibold">メールアドレス</Text>
               <TextInput
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
                 placeholder="example@email.com"
-                placeholderTextColor="#999"
                 value={email}
                 onChangeText={setEmail}
+                editable={!loading}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                editable={!loading}
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                placeholderTextColor="#999"
               />
             </View>
 
             {/* パスワード */}
-            <View>
-              <Text className="text-foreground font-semibold mb-2">パスワード</Text>
+            <View className="gap-2">
+              <Text className="text-foreground font-semibold">パスワード</Text>
               <TextInput
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
                 placeholder="6文字以上"
-                placeholderTextColor="#999"
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
                 editable={!loading}
+                secureTextEntry
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                placeholderTextColor="#999"
               />
             </View>
 
             {/* パスワード確認 */}
-            <View>
-              <Text className="text-foreground font-semibold mb-2">パスワード確認</Text>
+            <View className="gap-2">
+              <Text className="text-foreground font-semibold">パスワード確認</Text>
               <TextInput
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
                 placeholder="パスワードを再入力"
-                placeholderTextColor="#999"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
-                secureTextEntry
                 editable={!loading}
+                secureTextEntry
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                placeholderTextColor="#999"
               />
             </View>
           </View>
 
           {/* 登録ボタン */}
-          <TouchableOpacity
-            className="bg-primary px-8 py-4 rounded-full active:opacity-80"
+          <Pressable
             onPress={handleSignUp}
             disabled={loading}
+            className="bg-primary rounded-full py-3 active:opacity-80"
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="white" />
             ) : (
-              <Text className="text-background font-bold text-center">アカウントを作成</Text>
+              <Text className="text-white font-semibold text-center">アカウントを作成</Text>
             )}
-          </TouchableOpacity>
+          </Pressable>
 
-          {/* ログインへのリンク */}
-          <View className="flex-row justify-center gap-1 mt-4">
+          {/* ログインリンク */}
+          <View className="flex-row justify-center gap-1">
             <Text className="text-muted">既にアカウントをお持ちの方は</Text>
-            <TouchableOpacity onPress={() => router.push("/auth/login" as any)}>
-              <Text className="text-primary font-semibold">こちら</Text>
-            </TouchableOpacity>
+            <Pressable onPress={() => router.push("/auth/login" as any)}>
+              <Text className="text-primary font-semibold">ログイン</Text>
+            </Pressable>
           </View>
         </View>
       </ScrollView>
