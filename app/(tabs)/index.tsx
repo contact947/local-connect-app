@@ -1,6 +1,6 @@
 import { ScrollView, Text, View, FlatList, ActivityIndicator, RefreshControl, Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { useInitialRoute } from "@/hooks/use-initial-route";
 import { trpc } from "@/lib/trpc";
 import { router } from "expo-router";

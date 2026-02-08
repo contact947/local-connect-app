@@ -1,4 +1,4 @@
-import { UserProfile } from "@/hooks/use-firebase-auth";
+import { UserProfile } from '@/hooks/use-firebase-auth-modular';
 
 export type Role = "admin" | "planner" | "user";
 

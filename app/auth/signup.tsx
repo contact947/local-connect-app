@@ -1,11 +1,11 @@
 import { ScrollView, Text, View, Pressable, TextInput, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { router } from "expo-router";
 import { useState } from "react";
 
 export default function SignUpScreen() {
-  const { signUp, loading, error } = useFirebaseAuthContext();
+  const { signup, loading, error } = useFirebaseAuthContext();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -38,7 +38,7 @@ export default function SignUpScreen() {
     }
 
     try {
-      await signUp(email, password, name);
+      await signup(email, password, name);
       router.replace("/(tabs)" as any);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "登録に失敗しました";

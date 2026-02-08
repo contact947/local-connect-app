@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { router } from "expo-router";
 
 /**

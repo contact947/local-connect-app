@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { router } from "expo-router";
 import { getUserProfileFromFirestore, updateUserProfileInFirestore } from "@/lib/firestore-utils";
 

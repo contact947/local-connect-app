@@ -1,11 +1,11 @@
 import { ScrollView, Text, View, Pressable, TextInput, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { router } from "expo-router";
 import { useState } from "react";
 
 export default function LoginScreen() {
-  const { signIn, loading, error } = useFirebaseAuthContext();
+  const { login, loading, error } = useFirebaseAuthContext();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export default function LoginScreen() {
     }
 
     try {
-      await signIn(email, password);
+      await login(email, password);
       router.replace("/(tabs)" as any);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "ログインに失敗しました";
