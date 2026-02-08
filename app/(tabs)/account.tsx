@@ -77,52 +77,6 @@ export default function AccountScreen() {
     Alert.alert("コピーしました", "クリップボードにコピーされました");
   };
 
-  const handleSaveWithConfirmation = () => {
-    Alert.alert(
-      "プロフィール更新",
-      "変更内容を保存しますか？",
-      [
-        { text: "キャンセル", style: "cancel" },
-        {
-          text: "保存",
-          style: "default",
-          onPress: handleSave,
-        },
-      ]
-    );
-  };
-
-  const handleCancelWithConfirmation = () => {
-    Alert.alert(
-      "編集キャンセル",
-      "変更内容を破棄しますか？",
-      [
-        { text: "続ける", style: "cancel" },
-        {
-          text: "破棄",
-          style: "destructive",
-          onPress: () => {
-            setIsEditing(false);
-            if (profile) {
-              const address = profile.address || "";
-              const prefecture = extractPrefectureFromAddress(address) || "";
-              const city = address.replace(prefecture, "").trim() || "";
-
-              setFormData({
-                name: profile.name || "",
-                age: profile.age?.toString() || "",
-                gender: profile.gender || "prefer_not_to_say",
-                prefecture: prefecture,
-                city: city,
-                occupation: profile.occupation || "",
-              });
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const handleSave = async () => {
     if (!user) return;
 
@@ -150,22 +104,32 @@ export default function AccountScreen() {
     }
   };
 
+  const handleCancel = () => {
+    setIsEditing(false);
+    if (profile) {
+      const address = profile.address || "";
+      const prefecture = extractPrefectureFromAddress(address) || "";
+      const city = address.replace(prefecture, "").trim() || "";
+
+      setFormData({
+        name: profile.name || "",
+        age: profile.age?.toString() || "",
+        gender: profile.gender || "prefer_not_to_say",
+        prefecture: prefecture,
+        city: city,
+        occupation: profile.occupation || "",
+      });
+    }
+  };
+
   const handleLogout = async () => {
-    Alert.alert("ログアウト", "ログアウトしますか？", [
-      { text: "キャンセル", style: "cancel" },
-      {
-        text: "ログアウト",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await logout();
-            router.replace("/auth/welcome" as any);
-          } catch (error) {
-            Alert.alert("エラー", "ログアウトに失敗しました");
-          }
-        },
-      },
-    ]);
+    try {
+      await logout();
+      router.replace("/auth/welcome" as any);
+    } catch (error) {
+      Alert.alert("エラー", "ログアウトに失敗しました");
+      console.error(error);
+    }
   };
 
   if (authLoading || loading) {
@@ -343,7 +307,7 @@ export default function AccountScreen() {
                 {/* ボタン */}
                 <View className="flex-row gap-3 mt-2">
                   <Pressable
-                    onPress={handleCancelWithConfirmation}
+                    onPress={handleCancel}
                     disabled={isSaving}
                     style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
                     className="flex-1 bg-surface py-3 rounded-lg border border-border"
@@ -351,7 +315,7 @@ export default function AccountScreen() {
                     <Text className="text-center font-semibold text-foreground">キャンセル</Text>
                   </Pressable>
                   <Pressable
-                    onPress={handleSaveWithConfirmation}
+                    onPress={handleSave}
                     disabled={isSaving}
                     style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
                     className="flex-1 bg-primary py-3 rounded-lg"
