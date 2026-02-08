@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
+import { ScrollView, Text, View, Pressable, TextInput, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider";
 import { router } from "expo-router";
@@ -18,6 +18,10 @@ export default function LoginScreen() {
       setLocalError("メールアドレスを入力してください");
       return;
     }
+    if (!email.includes("@")) {
+      setLocalError("有効なメールアドレスを入力してください");
+      return;
+    }
     if (!password.trim()) {
       setLocalError("パスワードを入力してください");
       return;
@@ -25,8 +29,7 @@ export default function LoginScreen() {
 
     try {
       await signIn(email, password);
-      Alert.alert("成功", "ログインしました");
-      router.replace("/(tabs)");
+      router.replace("/(tabs)" as any);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "ログインに失敗しました";
       setLocalError(errorMessage);
@@ -38,9 +41,9 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6 py-8">
         <View className="flex-1 justify-center gap-6">
           {/* ヘッダー */}
-          <View className="mb-4">
+          <View className="gap-2">
             <Text className="text-3xl font-bold text-foreground">ログイン</Text>
-            <Text className="text-muted mt-2">アカウントにログイン</Text>
+            <Text className="text-muted">アカウントにログイン</Text>
           </View>
 
           {/* エラーメッセージ */}
@@ -53,54 +56,54 @@ export default function LoginScreen() {
           {/* フォーム */}
           <View className="gap-4">
             {/* メールアドレス */}
-            <View>
-              <Text className="text-foreground font-semibold mb-2">メールアドレス</Text>
+            <View className="gap-2">
+              <Text className="text-foreground font-semibold">メールアドレス</Text>
               <TextInput
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
                 placeholder="example@email.com"
-                placeholderTextColor="#999"
                 value={email}
                 onChangeText={setEmail}
+                editable={!loading}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                editable={!loading}
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                placeholderTextColor="#999"
               />
             </View>
 
             {/* パスワード */}
-            <View>
-              <Text className="text-foreground font-semibold mb-2">パスワード</Text>
+            <View className="gap-2">
+              <Text className="text-foreground font-semibold">パスワード</Text>
               <TextInput
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
                 placeholder="パスワード"
-                placeholderTextColor="#999"
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
                 editable={!loading}
+                secureTextEntry
+                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
+                placeholderTextColor="#999"
               />
             </View>
           </View>
 
           {/* ログインボタン */}
-          <TouchableOpacity
-            className="bg-primary px-8 py-4 rounded-full active:opacity-80"
+          <Pressable
             onPress={handleLogin}
             disabled={loading}
+            className="bg-primary rounded-full py-3 active:opacity-80"
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="white" />
             ) : (
-              <Text className="text-background font-bold text-center">ログイン</Text>
+              <Text className="text-white font-semibold text-center">ログイン</Text>
             )}
-          </TouchableOpacity>
+          </Pressable>
 
           {/* 新規登録へのリンク */}
-          <View className="flex-row justify-center gap-1 mt-4">
+          <View className="flex-row justify-center gap-1">
             <Text className="text-muted">アカウントをお持ちでない方は</Text>
-            <TouchableOpacity onPress={() => router.push("/auth/signup" as any)}>
-              <Text className="text-primary font-semibold">こちら</Text>
-            </TouchableOpacity>
+            <Pressable onPress={() => router.push("/auth/signup" as any)}>
+              <Text className="text-primary font-semibold">新規登録</Text>
+            </Pressable>
           </View>
         </View>
       </ScrollView>

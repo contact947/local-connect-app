@@ -1,76 +1,76 @@
 import { useState, useEffect } from "react";
-import { ScrollView, Text, View, TextInput, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { ScrollView, Text, View, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { useAuth } from "@/hooks/use-auth";
-import { trpc } from "@/lib/trpc";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider";
 import { router } from "expo-router";
-import { startOAuthLogin } from "@/constants/oauth";
+import { getUserProfileFromFirestore, updateUserProfileInFirestore } from "@/lib/firestore-utils";
 
 export default function AccountScreen() {
-  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
-  const { data: profile, isLoading: profileLoading, refetch } = trpc.profile.get.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
-
+  const { user, loading: authLoading, logout } = useFirebaseAuthContext();
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
+    name: "",
     age: "",
-    gender: "prefer_not_to_say" as "male" | "female" | "other" | "prefer_not_to_say",
+    gender: "prefer_not_to_say",
     address: "",
-    prefecture: "",
-    city: "",
-    schoolType: "other" as "high_school" | "university" | "working" | "other",
+    occupation: "",
   });
 
-  const createMutation = trpc.profile.create.useMutation({
-    onSuccess: () => {
-      refetch();
-      setIsEditing(false);
-      Alert.alert("成功", "プロフィールを作成しました");
-    },
-    onError: (error) => {
-      Alert.alert("エラー", error.message);
-    },
-  });
-
-  const updateMutation = trpc.profile.update.useMutation({
-    onSuccess: () => {
-      refetch();
-      setIsEditing(false);
-      Alert.alert("成功", "プロフィールを更新しました");
-    },
-    onError: (error) => {
-      Alert.alert("エラー", error.message);
-    },
-  });
-
+  // プロフィール取得
   useEffect(() => {
-    if (profile) {
-      setFormData({
-        age: profile.age?.toString() || "",
-        gender: profile.gender || "prefer_not_to_say",
-        address: profile.address || "",
-        prefecture: profile.prefecture || "",
-        city: profile.city || "",
-        schoolType: profile.schoolType || "other",
-      });
-    }
-  }, [profile]);
-
-  const handleSave = async () => {
-    const data = {
-      age: formData.age ? parseInt(formData.age) : undefined,
-      gender: formData.gender,
-      address: formData.address || undefined,
-      prefecture: formData.prefecture || undefined,
-      city: formData.city || undefined,
-      schoolType: formData.schoolType,
+    const fetchProfile = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const data = await getUserProfileFromFirestore(user.uid);
+        setProfile(data);
+        if (data) {
+          setFormData({
+            name: data.name || "",
+            age: data.age?.toString() || "",
+            gender: data.gender || "prefer_not_to_say",
+            address: data.address || "",
+            occupation: data.occupation || "",
+          });
+        }
+      } catch (error) {
+        console.error("プロフィール取得エラー:", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    if (profile) {
-      await updateMutation.mutateAsync(data);
-    } else {
-      await createMutation.mutateAsync(data);
+    fetchProfile();
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user) return;
+
+    setIsSaving(true);
+    try {
+      await updateUserProfileInFirestore(user.uid, {
+        name: formData.name,
+        age: formData.age ? parseInt(formData.age) : undefined,
+        gender: formData.gender as "male" | "female" | "other" | "prefer_not_to_say",
+        address: formData.address,
+        occupation: formData.occupation,
+      });
+
+      // プロフィール再取得
+      const updatedData = await getUserProfileFromFirestore(user.uid);
+      setProfile(updatedData);
+      setIsEditing(false);
+      Alert.alert("成功", "プロフィールを更新しました");
+    } catch (error) {
+      Alert.alert("エラー", "プロフィール更新に失敗しました");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -81,14 +81,18 @@ export default function AccountScreen() {
         text: "ログアウト",
         style: "destructive",
         onPress: async () => {
-          await logout();
-          router.replace("/");
+          try {
+            await logout();
+            router.replace("/auth/welcome" as any);
+          } catch (error) {
+            Alert.alert("エラー", "ログアウトに失敗しました");
+          }
         },
       },
     ]);
   };
 
-  if (authLoading || profileLoading) {
+  if (authLoading || loading) {
     return (
       <ScreenContainer className="justify-center items-center">
         <ActivityIndicator size="large" />
@@ -96,17 +100,17 @@ export default function AccountScreen() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <ScreenContainer className="justify-center items-center p-6">
         <Text className="text-2xl font-bold text-foreground mb-4">アカウント</Text>
         <Text className="text-muted text-center mb-6">ログインしてプロフィールを管理しましょう</Text>
-        <TouchableOpacity
+        <Pressable
           className="bg-primary px-8 py-3 rounded-full"
-          onPress={() => router.push('/auth/welcome')}
+          onPress={() => router.push("/auth/welcome" as any)}
         >
-          <Text className="text-background font-semibold">ログイン</Text>
-        </TouchableOpacity>
+          <Text className="text-white font-semibold">ログイン</Text>
+        </Pressable>
       </ScreenContainer>
     );
   }
@@ -115,53 +119,70 @@ export default function AccountScreen() {
     <ScreenContainer>
       <ScrollView className="flex-1 p-6">
         <View className="gap-6">
-          <View className="items-center mb-4">
+          {/* ヘッダー */}
+          <View className="gap-2">
             <Text className="text-3xl font-bold text-foreground">アカウント</Text>
+            <Text className="text-muted">プロフィール情報を管理</Text>
           </View>
 
-          {/* ユーザー基本情報 */}
-          <View className="bg-surface rounded-2xl p-4 border border-border">
-            <Text className="text-sm text-muted mb-2">アカウントID</Text>
-            <Text className="text-base text-foreground font-mono">{user?.id}</Text>
-          </View>
+          {/* ユーザー基本情報（表示のみ） */}
+          <View className="gap-4">
+            {/* アカウントID */}
+            <View className="bg-surface rounded-lg p-4 border border-border">
+              <Text className="text-xs text-muted mb-1">アカウントID</Text>
+              <Text className="text-base text-foreground font-mono">{user.uid}</Text>
+            </View>
 
-          <View className="bg-surface rounded-2xl p-4 border border-border">
-            <Text className="text-sm text-muted mb-2">名前</Text>
-            <Text className="text-base text-foreground">{user?.name || "未設定"}</Text>
-          </View>
-
-          <View className="bg-surface rounded-2xl p-4 border border-border">
-            <Text className="text-sm text-muted mb-2">メールアドレス</Text>
-            <Text className="text-base text-foreground">{user?.email || "未設定"}</Text>
+            {/* メールアドレス */}
+            <View className="bg-surface rounded-lg p-4 border border-border">
+              <Text className="text-xs text-muted mb-1">メールアドレス</Text>
+              <Text className="text-base text-foreground">{user.email}</Text>
+            </View>
           </View>
 
           {/* プロフィール情報 */}
-          <View className="mt-4">
-            <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-xl font-bold text-foreground">プロフィール</Text>
+          <View className="gap-4">
+            <View className="flex-row justify-between items-center">
+              <Text className="text-lg font-bold text-foreground">プロフィール</Text>
               {!isEditing && (
-                <TouchableOpacity onPress={() => setIsEditing(true)}>
+                <Pressable onPress={() => setIsEditing(true)}>
                   <Text className="text-primary font-semibold">編集</Text>
-                </TouchableOpacity>
+                </Pressable>
               )}
             </View>
 
             {isEditing ? (
               <View className="gap-4">
-                <View>
-                  <Text className="text-sm text-muted mb-2">年齢</Text>
+                {/* 氏名 */}
+                <View className="gap-2">
+                  <Text className="text-sm text-muted font-semibold">氏名</Text>
                   <TextInput
-                    className="bg-surface rounded-xl p-4 text-foreground border border-border"
-                    placeholder="年齢を入力"
-                    placeholderTextColor="#687076"
-                    keyboardType="number-pad"
-                    value={formData.age}
-                    onChangeText={(text) => setFormData({ ...formData, age: text })}
+                    placeholder="山田太郎"
+                    value={formData.name}
+                    onChangeText={(text) => setFormData({ ...formData, name: text })}
+                    className="bg-surface rounded-lg p-3 text-foreground border border-border"
+                    placeholderTextColor="#999"
+                    editable={!isSaving}
                   />
                 </View>
 
-                <View>
-                  <Text className="text-sm text-muted mb-2">性別</Text>
+                {/* 年齢 */}
+                <View className="gap-2">
+                  <Text className="text-sm text-muted font-semibold">年齢</Text>
+                  <TextInput
+                    placeholder="20"
+                    value={formData.age}
+                    onChangeText={(text) => setFormData({ ...formData, age: text })}
+                    keyboardType="number-pad"
+                    className="bg-surface rounded-lg p-3 text-foreground border border-border"
+                    placeholderTextColor="#999"
+                    editable={!isSaving}
+                  />
+                </View>
+
+                {/* 性別 */}
+                <View className="gap-2">
+                  <Text className="text-sm text-muted font-semibold">性別</Text>
                   <View className="flex-row gap-2">
                     {[
                       { value: "male", label: "男性" },
@@ -169,141 +190,104 @@ export default function AccountScreen() {
                       { value: "other", label: "その他" },
                       { value: "prefer_not_to_say", label: "回答しない" },
                     ].map((option) => (
-                      <TouchableOpacity
+                      <Pressable
                         key={option.value}
-                        className={`flex-1 py-3 rounded-xl border ${
+                        onPress={() => setFormData({ ...formData, gender: option.value })}
+                        disabled={isSaving}
+                        className={`flex-1 py-2 rounded-lg border ${
                           formData.gender === option.value
                             ? "bg-primary border-primary"
                             : "bg-surface border-border"
                         }`}
-                        onPress={() =>
-                          setFormData({
-                            ...formData,
-                            gender: option.value as any,
-                          })
-                        }
                       >
                         <Text
-                          className={`text-center font-semibold ${
-                            formData.gender === option.value ? "text-background" : "text-foreground"
+                          className={`text-center text-xs font-semibold ${
+                            formData.gender === option.value ? "text-white" : "text-foreground"
                           }`}
                         >
                           {option.label}
                         </Text>
-                      </TouchableOpacity>
+                      </Pressable>
                     ))}
                   </View>
                 </View>
 
-                <View>
-                  <Text className="text-sm text-muted mb-2">都道府県</Text>
+                {/* 住所 */}
+                <View className="gap-2">
+                  <Text className="text-sm text-muted font-semibold">住所</Text>
                   <TextInput
-                    className="bg-surface rounded-xl p-4 text-foreground border border-border"
-                    placeholder="例: 東京都"
-                    placeholderTextColor="#687076"
-                    value={formData.prefecture}
-                    onChangeText={(text) => setFormData({ ...formData, prefecture: text })}
-                  />
-                </View>
-
-                <View>
-                  <Text className="text-sm text-muted mb-2">市区町村</Text>
-                  <TextInput
-                    className="bg-surface rounded-xl p-4 text-foreground border border-border"
-                    placeholder="例: 渋谷区"
-                    placeholderTextColor="#687076"
-                    value={formData.city}
-                    onChangeText={(text) => setFormData({ ...formData, city: text })}
-                  />
-                </View>
-
-                <View>
-                  <Text className="text-sm text-muted mb-2">住所</Text>
-                  <TextInput
-                    className="bg-surface rounded-xl p-4 text-foreground border border-border"
-                    placeholder="例: 東京都渋谷区"
-                    placeholderTextColor="#687076"
+                    placeholder="東京都渋谷区"
                     value={formData.address}
                     onChangeText={(text) => setFormData({ ...formData, address: text })}
+                    className="bg-surface rounded-lg p-3 text-foreground border border-border"
+                    placeholderTextColor="#999"
+                    editable={!isSaving}
                   />
                 </View>
 
-                <View>
-                  <Text className="text-sm text-muted mb-2">学校区分</Text>
-                  <View className="flex-row gap-2">
-                    {[
-                      { value: "high_school", label: "高校生" },
-                      { value: "university", label: "大学生" },
-                      { value: "working", label: "社会人" },
-                      { value: "other", label: "その他" },
-                    ].map((option) => (
-                      <TouchableOpacity
-                        key={option.value}
-                        className={`flex-1 py-3 rounded-xl border ${
-                          formData.schoolType === option.value
-                            ? "bg-primary border-primary"
-                            : "bg-surface border-border"
-                        }`}
-                        onPress={() =>
-                          setFormData({
-                            ...formData,
-                            schoolType: option.value as any,
-                          })
-                        }
-                      >
-                        <Text
-                          className={`text-center font-semibold ${
-                            formData.schoolType === option.value ? "text-background" : "text-foreground"
-                          }`}
-                        >
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                {/* 職業 */}
+                <View className="gap-2">
+                  <Text className="text-sm text-muted font-semibold">職業</Text>
+                  <TextInput
+                    placeholder="学生 / 社会人"
+                    value={formData.occupation}
+                    onChangeText={(text) => setFormData({ ...formData, occupation: text })}
+                    className="bg-surface rounded-lg p-3 text-foreground border border-border"
+                    placeholderTextColor="#999"
+                    editable={!isSaving}
+                  />
                 </View>
 
+                {/* ボタン */}
                 <View className="flex-row gap-3 mt-2">
-                  <TouchableOpacity
-                    className="flex-1 bg-surface py-3 rounded-xl border border-border"
+                  <Pressable
                     onPress={() => {
                       setIsEditing(false);
                       if (profile) {
                         setFormData({
+                          name: profile.name || "",
                           age: profile.age?.toString() || "",
                           gender: profile.gender || "prefer_not_to_say",
                           address: profile.address || "",
-                          prefecture: profile.prefecture || "",
-                          city: profile.city || "",
-                          schoolType: profile.schoolType || "other",
+                          occupation: profile.occupation || "",
                         });
                       }
                     }}
+                    disabled={isSaving}
+                    className="flex-1 bg-surface py-3 rounded-lg border border-border active:opacity-70"
                   >
                     <Text className="text-center font-semibold text-foreground">キャンセル</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    className="flex-1 bg-primary py-3 rounded-xl"
+                  </Pressable>
+                  <Pressable
                     onPress={handleSave}
-                    disabled={createMutation.isPending || updateMutation.isPending}
+                    disabled={isSaving}
+                    className="flex-1 bg-primary py-3 rounded-lg active:opacity-70"
                   >
-                    {createMutation.isPending || updateMutation.isPending ? (
-                      <ActivityIndicator color="#ffffff" />
+                    {isSaving ? (
+                      <ActivityIndicator color="white" />
                     ) : (
-                      <Text className="text-center font-semibold text-background">保存</Text>
+                      <Text className="text-center font-semibold text-white">保存</Text>
                     )}
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               </View>
             ) : (
-              <View className="gap-4">
-                <View className="bg-surface rounded-2xl p-4 border border-border">
-                  <Text className="text-sm text-muted mb-2">年齢</Text>
+              <View className="gap-3">
+                {/* 氏名 */}
+                <View className="bg-surface rounded-lg p-4 border border-border">
+                  <Text className="text-xs text-muted mb-1">氏名</Text>
+                  <Text className="text-base text-foreground">{profile?.name || "未設定"}</Text>
+                </View>
+
+                {/* 年齢 */}
+                <View className="bg-surface rounded-lg p-4 border border-border">
+                  <Text className="text-xs text-muted mb-1">年齢</Text>
                   <Text className="text-base text-foreground">{profile?.age || "未設定"}</Text>
                 </View>
 
-                <View className="bg-surface rounded-2xl p-4 border border-border">
-                  <Text className="text-sm text-muted mb-2">性別</Text>
+                {/* 性別 */}
+                <View className="bg-surface rounded-lg p-4 border border-border">
+                  <Text className="text-xs text-muted mb-1">性別</Text>
                   <Text className="text-base text-foreground">
                     {profile?.gender === "male"
                       ? "男性"
@@ -315,34 +299,30 @@ export default function AccountScreen() {
                   </Text>
                 </View>
 
-                <View className="bg-surface rounded-2xl p-4 border border-border">
-                  <Text className="text-sm text-muted mb-2">住所</Text>
+                {/* 住所 */}
+                <View className="bg-surface rounded-lg p-4 border border-border">
+                  <Text className="text-xs text-muted mb-1">住所</Text>
                   <Text className="text-base text-foreground">{profile?.address || "未設定"}</Text>
                 </View>
 
-                <View className="bg-surface rounded-2xl p-4 border border-border">
-                  <Text className="text-sm text-muted mb-2">学校区分</Text>
-                  <Text className="text-base text-foreground">
-                    {profile?.schoolType === "high_school"
-                      ? "高校生"
-                      : profile?.schoolType === "university"
-                        ? "大学生"
-                        : profile?.schoolType === "working"
-                          ? "社会人"
-                          : "その他"}
-                  </Text>
+                {/* 職業 */}
+                <View className="bg-surface rounded-lg p-4 border border-border">
+                  <Text className="text-xs text-muted mb-1">職業</Text>
+                  <Text className="text-base text-foreground">{profile?.occupation || "未設定"}</Text>
                 </View>
               </View>
             )}
           </View>
 
           {/* ログアウトボタン */}
-          <TouchableOpacity
-            className="bg-error py-4 rounded-xl mt-6"
+          <Pressable
             onPress={handleLogout}
+            className="bg-error/10 border border-error rounded-lg py-3 active:opacity-70"
           >
-            <Text className="text-center font-semibold text-background">ログアウト</Text>
-          </TouchableOpacity>
+            <Text className="text-center font-semibold text-error">ログアウト</Text>
+          </Pressable>
+
+          <View className="h-8" />
         </View>
       </ScrollView>
     </ScreenContainer>
