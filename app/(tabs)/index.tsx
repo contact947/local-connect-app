@@ -4,25 +4,31 @@ import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { useInitialRoute } from "@/hooks/use-initial-route";
 import { trpc } from "@/lib/trpc";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 export default function HomeScreen() {
   useInitialRoute();
-  const { user } = useFirebaseAuthContext();
+  const { user, profile } = useFirebaseAuthContext();
   const [refreshing, setRefreshing] = useState(false);
+
+  // ユーザーの登録県を取得（addressから都道府県を抽出）
+  const userPrefecture = useMemo(() => {
+    if (!profile?.address) return null;
+    // addressの最初の空白までが都道府県名（例: "東京都 渋谷区" → "東京都"）
+    return profile.address.split(" ")[0];
+  }, [profile?.address]);
 
   // トップニュース取得
   const { data: topNews, refetch: refetchTopNews, isLoading: loadingTopNews } = trpc.articles.list.useQuery({
     limit: 10,
   });
 
-  // 地域ニュース取得
-  const { data: regionNews, refetch: refetchRegionNews } = trpc.articles.list.useQuery(
+  // 地域ニュース取得（フィルタリングなし、全国の地域ニュースを取得）
+  const { data: allRegionNews, refetch: refetchRegionNews } = trpc.articles.list.useQuery(
     {
-      limit: 10,
-      prefecture: user?.address?.split(" ")[0] || undefined,
+      limit: 50, // より多く取得してからフィルタリング
     },
-    { enabled: !!user?.address }
+    { enabled: !!userPrefecture }
   );
 
   // 参加予定イベント取得
@@ -33,14 +39,31 @@ export default function HomeScreen() {
     { enabled: !!user?.uid }
   );
 
-  // 地域イベント取得
-  const { data: regionEvents, refetch: refetchRegionEvents } = trpc.events.list.useQuery(
+  // 地域イベント取得（フィルタリングなし、全国の地域イベントを取得）
+  const { data: allRegionEvents, refetch: refetchRegionEvents } = trpc.events.list.useQuery(
     {
-      limit: 10,
-      prefecture: user?.address?.split(" ")[0] || undefined,
+      limit: 50, // より多く取得してからフィルタリング
     },
-    { enabled: !!user?.address }
+    { enabled: !!userPrefecture }
   );
+
+  // ユーザーの県に該当するニュースをフィルタリング
+  const regionNews = useMemo(() => {
+    if (!allRegionNews || !userPrefecture) return [];
+    return allRegionNews.filter((article) => {
+      // prefectureフィールドがユーザーの登録県と一致するものをフィルタリング
+      return article.prefecture === userPrefecture;
+    }).slice(0, 10); // 最大10件に制限
+  }, [allRegionNews, userPrefecture]);
+
+  // ユーザーの県に該当するイベントをフィルタリング
+  const regionEvents = useMemo(() => {
+    if (!allRegionEvents || !userPrefecture) return [];
+    return allRegionEvents.filter((event) => {
+      // prefectureフィールドがユーザーの登録県と一致するものをフィルタリング
+      return event.prefecture === userPrefecture;
+    }).slice(0, 10); // 最大10件に制限
+  }, [allRegionEvents, userPrefecture]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -75,9 +98,11 @@ export default function HomeScreen() {
           {/* ウェルカムメッセージ */}
           <View className="px-4">
             <Text className="text-2xl font-bold text-foreground">
-              {user?.name ? `${user.name}さん、こんにちは` : "ようこそ"}
+              {user?.displayName ? `${user.displayName}さん、こんにちは` : "ようこそ"}
             </Text>
-            <Text className="text-muted mt-1">地域の最新情報をチェック</Text>
+            <Text className="text-muted mt-1">
+              {userPrefecture ? `${userPrefecture}の最新情報をチェック` : "地域の最新情報をチェック"}
+            </Text>
           </View>
 
           {/* 全国のトップニュース */}
@@ -193,10 +218,10 @@ export default function HomeScreen() {
           )}
 
           {/* 地域のニュース */}
-          {regionNews && regionNews.length > 0 && (
+          {regionNews && regionNews.length > 0 && userPrefecture && (
             <View>
               <View className="flex-row justify-between items-center mb-3 px-4">
-                <Text className="text-lg font-bold text-foreground">地域のニュース</Text>
+                <Text className="text-lg font-bold text-foreground">{userPrefecture}のニュース</Text>
                 <Pressable onPress={() => router.push("/(tabs)/news")}>
                   <Text className="text-primary text-sm">もっと見る</Text>
                 </Pressable>
@@ -243,10 +268,10 @@ export default function HomeScreen() {
           )}
 
           {/* 地域のイベント */}
-          {regionEvents && regionEvents.length > 0 && (
+          {regionEvents && regionEvents.length > 0 && userPrefecture && (
             <View>
               <View className="flex-row justify-between items-center mb-3 px-4">
-                <Text className="text-lg font-bold text-foreground">地域のイベント</Text>
+                <Text className="text-lg font-bold text-foreground">{userPrefecture}のイベント</Text>
                 <Pressable onPress={() => router.push("/(tabs)/events")}>
                   <Text className="text-primary text-sm">もっと見る</Text>
                 </Pressable>
