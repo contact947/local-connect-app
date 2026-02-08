@@ -7,6 +7,8 @@ import { getUserProfileFromFirestore, updateUserProfileInFirestore } from "@/lib
 import prefecturesData from "@/constants/prefectures.json";
 import { extractPrefectureFromAddress, getCitiesByPrefectureName } from "@/types/prefecture";
 import * as Clipboard from "expo-clipboard";
+import { GroupedPrefecturePicker } from "@/components/grouped-prefecture-picker";
+import { CityPicker } from "@/components/city-picker";
 
 export default function AccountScreen() {
   const { user, loading: authLoading, logout } = useFirebaseAuthContext();
@@ -299,7 +301,7 @@ export default function AccountScreen() {
                   <Pressable
                     onPress={() => setShowPrefectureModal(true)}
                     disabled={isSaving}
-                    className="bg-surface rounded-lg p-3 border border-border flex-row justify-between items-center"
+                    className="bg-surface rounded-lg p-3 border border-border flex-row justify-between items-center active:opacity-70"
                   >
                     <Text className={formData.prefecture ? "text-foreground" : "text-muted"}>
                       {formData.prefecture || "選択してください"}
@@ -314,7 +316,7 @@ export default function AccountScreen() {
                   <Pressable
                     onPress={() => setShowCityModal(true)}
                     disabled={isSaving || !formData.prefecture}
-                    className={`bg-surface rounded-lg p-3 border flex-row justify-between items-center ${
+                    className={`bg-surface rounded-lg p-3 border flex-row justify-between items-center active:opacity-70 ${
                       formData.prefecture ? "border-border" : "border-border opacity-50"
                     }`}
                   >
@@ -416,62 +418,21 @@ export default function AccountScreen() {
       </ScrollView>
 
       {/* 都道府県選択モーダル */}
-      <Modal
+      <GroupedPrefecturePicker
         visible={showPrefectureModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowPrefectureModal(false)}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-background rounded-t-3xl p-6 max-h-3/4">
-            <Text className="text-lg font-bold text-foreground mb-4">都道府県を選択</Text>
-            <FlatList
-              data={prefecturesData.prefectures}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => {
-                    setFormData({ ...formData, prefecture: item.name });
-                    setShowPrefectureModal(false);
-                  }}
-                  className="py-3 border-b border-border"
-                >
-                  <Text className="text-foreground">{item.name}</Text>
-                </Pressable>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
+        selectedValue={formData.prefecture}
+        onSelect={(prefecture) => setFormData({ ...formData, prefecture })}
+        onClose={() => setShowPrefectureModal(false)}
+      />
 
       {/* 市区町村選択モーダル */}
-      <Modal
+      <CityPicker
         visible={showCityModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowCityModal(false)}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-background rounded-t-3xl p-6 max-h-3/4">
-            <Text className="text-lg font-bold text-foreground mb-4">市区町村を選択</Text>
-            <FlatList
-              data={availableCities}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => {
-                    setFormData({ ...formData, city: item.name });
-                    setShowCityModal(false);
-                  }}
-                  className="py-3 border-b border-border"
-                >
-                  <Text className="text-foreground">{item.name}</Text>
-                </Pressable>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
+        selectedValue={formData.city}
+        cities={availableCities}
+        onSelect={(city) => setFormData({ ...formData, city })}
+        onClose={() => setShowCityModal(false)}
+      />
     </ScreenContainer>
   );
 }
