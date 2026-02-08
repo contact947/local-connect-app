@@ -1,21 +1,21 @@
 import { useState, useEffect } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert, RefreshControl } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/use-auth";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { router } from "expo-router";
 import * as Location from "expo-location";
 
 export default function GiftsScreen() {
   const colors = useColors();
-  const { isAuthenticated } = useAuth();
+  const { user } = useFirebaseAuthContext();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (user) {
       (async () => {
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
@@ -35,7 +35,7 @@ export default function GiftsScreen() {
         }
       })();
     }
-  }, [isAuthenticated]);
+  }, [user]);
 
   const { data: nearbyGifts, isLoading, refetch } = trpc.gifts.nearby.useQuery(
     {
@@ -44,7 +44,7 @@ export default function GiftsScreen() {
       limit: 20,
     },
     {
-      enabled: isAuthenticated && !!location,
+      enabled: !!user && !!location,
     }
   );
 
@@ -64,7 +64,7 @@ export default function GiftsScreen() {
           <Text className="text-muted mt-1">近くで使えるお得なギフト</Text>
         </View>
 
-        {!isAuthenticated && (
+        {!user && (
           <View className="mx-6 mb-4 p-4 bg-surface rounded-2xl border border-border">
             <Text className="text-foreground font-semibold mb-2">ログインしてギフトを表示</Text>
             <Text className="text-muted text-sm mb-3">
@@ -79,7 +79,7 @@ export default function GiftsScreen() {
           </View>
         )}
 
-        {locationError && isAuthenticated && (
+        {locationError && user && (
           <View className="mx-6 mb-4 p-4 bg-error/10 rounded-2xl border border-error">
             <Text className="text-error font-semibold mb-2">位置情報エラー</Text>
             <Text className="text-error text-sm">{locationError}</Text>
@@ -101,10 +101,10 @@ export default function GiftsScreen() {
             <View className="py-8 items-center">
               <ActivityIndicator size="large" />
             </View>
-          ) : !isAuthenticated || !location ? (
+          ) : !user || !location ? (
             <View className="py-8 items-center">
               <Text className="text-muted">
-                {!isAuthenticated ? "ログインしてギフトを表示" : "位置情報を取得中..."}
+                {!user ? "ログインしてギフトを表示" : "位置情報を取得中..."}
               </Text>
             </View>
           ) : nearbyGifts && nearbyGifts.length > 0 ? (
