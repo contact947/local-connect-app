@@ -345,14 +345,16 @@ export default function AccountScreen() {
                   <Pressable
                     onPress={handleCancelWithConfirmation}
                     disabled={isSaving}
-                    className="flex-1 bg-surface py-3 rounded-lg border border-border active:opacity-70"
+                    style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                    className="flex-1 bg-surface py-3 rounded-lg border border-border"
                   >
                     <Text className="text-center font-semibold text-foreground">キャンセル</Text>
                   </Pressable>
                   <Pressable
                     onPress={handleSaveWithConfirmation}
                     disabled={isSaving}
-                    className="flex-1 bg-primary py-3 rounded-lg active:opacity-70"
+                    style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                    className="flex-1 bg-primary py-3 rounded-lg"
                   >
                     {isSaving ? (
                       <ActivityIndicator color="white" />
@@ -408,7 +410,8 @@ export default function AccountScreen() {
           {/* ログアウトボタン */}
           <Pressable
             onPress={handleLogout}
-            className="bg-error/10 border border-error rounded-lg py-3 active:opacity-70"
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            className="bg-error/10 border border-error rounded-lg py-3"
           >
             <Text className="text-center font-semibold text-error">ログアウト</Text>
           </Pressable>
