@@ -61,7 +61,7 @@ export default function EventsScreen() {
     router.push(`/events/${eventId}`);
   };
 
-  const eventData = activeTab === "national" ? nationalEvents : regionEvents || [];
+  const eventData = (activeTab === "national" ? nationalEvents : regionEvents) || [];
   const isLoading = activeTab === "national" ? nationalLoading : regionLoading;
   const refreshing = activeTab === "national" ? nationalRefreshing : regionRefreshing;
   const onRefresh = activeTab === "national" ? onRefreshNational : onRefreshRegion;
