@@ -1,136 +1,198 @@
-import { ScrollView, Text, View, TouchableOpacity, RefreshControl, ActivityIndicator } from "react-native";
-import { Image } from "expo-image";
-
+import { ScrollView, Text, View, FlatList, ActivityIndicator, RefreshControl, Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { useColors } from "@/hooks/use-colors";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider";
+import { useInitialRoute } from "@/hooks/use-initial-route";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/use-auth";
 import { router } from "expo-router";
+import { useState } from "react";
 
 export default function HomeScreen() {
-  const colors = useColors();
-  const { user, isAuthenticated } = useAuth();
-  const { data: profile } = trpc.profile.get.useQuery(undefined, {
-    enabled: isAuthenticated,
+  useInitialRoute();
+  const { user } = useFirebaseAuthContext();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // トップニュース取得
+  const { data: topNews, refetch: refetchTopNews, isLoading: loadingTopNews } = trpc.articles.list.useQuery({
+    limit: 3,
   });
 
-  // ユーザーの地域に基づく記事を取得
-  const {
-    data: localArticles,
-    isLoading: articlesLoading,
-    refetch: refetchArticles,
-  } = trpc.articles.list.useQuery(
+  // 地域ニュース取得
+  const { data: regionNews, refetch: refetchRegionNews } = trpc.articles.list.useQuery(
     {
-      prefecture: profile?.prefecture || undefined,
-      city: profile?.city || undefined,
-      limit: 10,
+      limit: 3,
+      prefecture: user?.address?.split(" ")[0] || undefined,
     },
-    {
-      enabled: isAuthenticated && !!profile,
-    }
+    { enabled: !!user?.address }
   );
 
-  // Pull to Refresh
-  const { refreshing, onRefresh } = usePullToRefresh(refetchArticles);
+  // 参加予定イベント取得
+  const { data: upcomingEvents, refetch: refetchUpcomingEvents } = trpc.events.list.useQuery(
+    {
+      limit: 3,
+    },
+    { enabled: !!user?.uid }
+  );
 
-  const handleArticlePress = (articleId: number) => {
-    router.push(`/article/${articleId}` as any);
+  // 地域イベント取得
+  const { data: regionEvents, refetch: refetchRegionEvents } = trpc.events.list.useQuery(
+    {
+      limit: 3,
+      prefecture: user?.address?.split(" ")[0] || undefined,
+    },
+    { enabled: !!user?.address }
+  );
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchTopNews(),
+        refetchRegionNews(),
+        refetchUpcomingEvents(),
+        refetchRegionEvents(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
   };
+
+  if (loadingTopNews) {
+    return (
+      <ScreenContainer className="justify-center items-center">
+        <ActivityIndicator size="large" />
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
       <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         contentContainerStyle={{ flexGrow: 1 }}
+        className="px-4"
       >
-        <View className="flex-1">
-          {/* ヘッダー */}
-          <View className="p-6 pb-4">
-            <Text className="text-3xl font-bold text-foreground">
-              {isAuthenticated ? `${profile?.prefecture || ""}のニュース` : "ホーム"}
+        <View className="gap-6 py-4">
+          {/* ウェルカムメッセージ */}
+          <View>
+            <Text className="text-2xl font-bold text-foreground">
+              {user?.name ? `${user.name}さん、こんにちは` : "ようこそ"}
             </Text>
             <Text className="text-muted mt-1">地域の最新情報をチェック</Text>
           </View>
 
-          {!isAuthenticated && (
-            <View className="mx-6 mb-4 p-4 bg-surface rounded-2xl border border-border">
-              <Text className="text-foreground font-semibold mb-2">ログインして地域情報を表示</Text>
-              <Text className="text-muted text-sm mb-3">
-                ログインすると、あなたの地域に特化したニュースやイベント情報が表示されます
-              </Text>
-              <TouchableOpacity
-                className="bg-primary py-3 rounded-xl"
-                onPress={() => router.push("/(tabs)/account")}
-              >
-                <Text className="text-center font-semibold text-background">ログイン</Text>
-              </TouchableOpacity>
+          {/* 全国のトップニュース */}
+          <View>
+            <View className="flex-row justify-between items-center mb-3">
+              <Text className="text-lg font-bold text-foreground">全国のトップニュース</Text>
+              <Pressable onPress={() => router.push("/(tabs)/news")}>
+                <Text className="text-primary text-sm">もっと見る</Text>
+              </Pressable>
+            </View>
+            {topNews && topNews.length > 0 ? (
+              <FlatList
+                data={topNews}
+                keyExtractor={(item) => item.id.toString()}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => router.push(`/news/${item.id}` as any)}
+                    className="bg-surface rounded-lg p-3 mb-2 active:opacity-70"
+                  >
+                    <Text className="text-foreground font-semibold text-sm" numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                    <Text className="text-muted text-xs mt-1">{item.category}</Text>
+                  </Pressable>
+                )}
+              />
+            ) : (
+              <Text className="text-muted text-center py-4">ニュースがありません</Text>
+            )}
+          </View>
+
+          {/* 参加予定のイベント */}
+          {upcomingEvents && upcomingEvents.length > 0 && user && (
+            <View>
+              <View className="flex-row justify-between items-center mb-3">
+                <Text className="text-lg font-bold text-foreground">参加予定のイベント</Text>
+                <Pressable onPress={() => router.push("/(tabs)/events")}>
+                  <Text className="text-primary text-sm">もっと見る</Text>
+                </Pressable>
+              </View>
+              <FlatList
+                data={upcomingEvents}
+                keyExtractor={(item) => item.id.toString()}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => router.push(`/events/${item.id}` as any)}
+                    className="bg-surface rounded-lg p-3 mb-2 active:opacity-70"
+                  >
+                    <Text className="text-foreground font-semibold text-sm" numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text className="text-muted text-xs mt-1">{new Date(item.eventDate).toLocaleDateString()}</Text>
+                  </Pressable>
+                )}
+              />
             </View>
           )}
 
-          {/* 記事一覧 */}
-          <View className="px-6 flex-1">
-            {articlesLoading && !localArticles ? (
-              <View className="py-8 items-center">
-                <ActivityIndicator size="large" color={colors.primary} />
+          {/* 地域のニュース */}
+          {regionNews && regionNews.length > 0 && (
+            <View>
+              <View className="flex-row justify-between items-center mb-3">
+                <Text className="text-lg font-bold text-foreground">地域のニュース</Text>
+                <Pressable onPress={() => router.push("/(tabs)/news")}>
+                  <Text className="text-primary text-sm">もっと見る</Text>
+                </Pressable>
               </View>
-            ) : localArticles && localArticles.length > 0 ? (
-              <View className="gap-4 pb-6">
-                {localArticles.map((article) => (
-                  <TouchableOpacity
-                    key={article.id}
-                    className="bg-surface rounded-2xl overflow-hidden border border-border"
-                    onPress={() => handleArticlePress(article.id)}
+              <FlatList
+                data={regionNews}
+                keyExtractor={(item) => item.id.toString()}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => router.push(`/news/${item.id}` as any)}
+                    className="bg-surface rounded-lg p-3 mb-2 active:opacity-70"
                   >
-                    {article.imageUrl && (
-                      <Image
-                        source={{ uri: article.imageUrl }}
-                        style={{ width: "100%", height: 180 }}
-                        contentFit="cover"
-                      />
-                    )}
-                    <View className="p-4">
-                      <View className="flex-row items-center gap-2 mb-2">
-                        <Text className="text-xs font-semibold bg-primary text-background px-2 py-1 rounded">
-                          {article.category === "store"
-                            ? "店舗"
-                            : article.category === "event"
-                              ? "イベント"
-                              : article.category === "interview"
-                                ? "インタビュー"
-                                : article.category === "column"
-                                  ? "コラム"
-                                  : "その他"}
-                        </Text>
-                      </View>
-                      <Text className="text-foreground font-bold text-lg mb-2" numberOfLines={2}>
-                        {article.title}
-                      </Text>
-                      <Text className="text-muted text-sm mb-3" numberOfLines={2}>
-                        {article.content}
-                      </Text>
-                      <View className="flex-row justify-between items-center pt-3 border-t border-border">
-                        <Text className="text-muted text-xs">
-                          {new Date(article.publishedAt).toLocaleDateString("ja-JP")}
-                        </Text>
-                        <Text className="text-muted text-xs">👁 {article.viewCount}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                    <Text className="text-foreground font-semibold text-sm" numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                    <Text className="text-muted text-xs mt-1">{item.category}</Text>
+                  </Pressable>
+                )}
+              />
+            </View>
+          )}
+
+          {/* 地域のイベント */}
+          {regionEvents && regionEvents.length > 0 && (
+            <View>
+              <View className="flex-row justify-between items-center mb-3">
+                <Text className="text-lg font-bold text-foreground">地域のイベント</Text>
+                <Pressable onPress={() => router.push("/(tabs)/events")}>
+                  <Text className="text-primary text-sm">もっと見る</Text>
+                </Pressable>
               </View>
-            ) : isAuthenticated ? (
-              <View className="py-8 items-center">
-                <Text className="text-muted">この地域のニュースはまだありません</Text>
-              </View>
-            ) : null}
-          </View>
+              <FlatList
+                data={regionEvents}
+                keyExtractor={(item) => item.id.toString()}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => router.push(`/events/${item.id}` as any)}
+                    className="bg-surface rounded-lg p-3 mb-2 active:opacity-70"
+                  >
+                    <Text className="text-foreground font-semibold text-sm" numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text className="text-muted text-xs mt-1">{new Date(item.eventDate).toLocaleDateString()}</Text>
+                  </Pressable>
+                )}
+              />
+            </View>
+          )}
         </View>
       </ScrollView>
     </ScreenContainer>
