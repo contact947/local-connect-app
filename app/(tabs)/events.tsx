@@ -1,46 +1,63 @@
 import { useState } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert, RefreshControl } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert, RefreshControl, Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/use-auth";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { router } from "expo-router";
+
+type EventSegment = "national" | "region";
+type EventTab = "upcoming" | "list";
 
 export default function EventsScreen() {
   const colors = useColors();
-  const { isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState<"upcoming" | "local">("upcoming");
+  const { user, profile } = useFirebaseAuthContext();
+  const [segment, setSegment] = useState<EventSegment>("national");
+  const [activeTab, setActiveTab] = useState<EventTab>("upcoming");
 
-  const { data: profile } = trpc.profile.get.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
-
+  // 参加予定チケット取得
   const { data: myTickets, isLoading: ticketsLoading, refetch: refetchTickets } = trpc.tickets.myTickets.useQuery(
     undefined,
     {
-      enabled: isAuthenticated && activeTab === "upcoming",
+      enabled: !!user && activeTab === "upcoming",
     }
   );
 
-  const { data: localEvents, isLoading: eventsLoading, refetch: refetchEvents } = trpc.events.list.useQuery(
+  // 全国のイベント取得
+  const { data: nationalEvents, isLoading: nationalLoading, refetch: refetchNationalEvents } = trpc.events.list.useQuery(
     {
-      prefecture: profile?.prefecture || undefined,
-      city: profile?.city || undefined,
       limit: 20,
     },
     {
-      enabled: isAuthenticated && activeTab === "local" && !!profile,
+      enabled: !!user && segment === "national" && activeTab === "list",
+    }
+  );
+
+  // 地域のイベント取得
+  const { data: regionEvents, isLoading: regionLoading, refetch: refetchRegionEvents } = trpc.events.list.useQuery(
+    {
+      prefecture: profile?.address?.split(" ")[0] || undefined,
+      limit: 20,
+    },
+    {
+      enabled: !!user && segment === "region" && activeTab === "list" && !!profile?.address,
     }
   );
 
   // Pull to Refresh
   const { refreshing: ticketsRefreshing, onRefresh: onRefreshTickets } = usePullToRefresh(refetchTickets);
-  const { refreshing: eventsRefreshing, onRefresh: onRefreshEvents } = usePullToRefresh(refetchEvents);
+  const { refreshing: nationalRefreshing, onRefresh: onRefreshNational } = usePullToRefresh(refetchNationalEvents);
+  const { refreshing: regionRefreshing, onRefresh: onRefreshRegion } = usePullToRefresh(refetchRegionEvents);
 
   const handleEventPress = (eventId: number) => {
     router.push(`/events/${eventId}`);
   };
+
+  const eventData = segment === "national" ? nationalEvents : regionEvents;
+  const isLoading = segment === "national" ? nationalLoading : regionLoading;
+  const refreshing = segment === "national" ? nationalRefreshing : regionRefreshing;
+  const onRefresh = segment === "national" ? onRefreshNational : onRefreshRegion;
 
   return (
     <ScreenContainer>
@@ -48,10 +65,12 @@ export default function EventsScreen() {
         {/* ヘッダー */}
         <View className="p-6 pb-4">
           <Text className="text-3xl font-bold text-foreground">イベント</Text>
-          <Text className="text-muted mt-1">地域のイベントをチェック</Text>
+          <Text className="text-muted mt-1">
+            {activeTab === "upcoming" ? "参加予定のイベント" : (segment === "national" ? "全国のイベント" : "地域のイベント")}
+          </Text>
         </View>
 
-        {!isAuthenticated && (
+        {!user && (
           <View className="mx-6 mb-4 p-4 bg-surface rounded-2xl border border-border">
             <Text className="text-foreground font-semibold mb-2">ログインしてイベントを表示</Text>
             <Text className="text-muted text-sm mb-3">
@@ -59,15 +78,15 @@ export default function EventsScreen() {
             </Text>
             <TouchableOpacity
               className="bg-primary py-3 rounded-xl"
-              onPress={() => router.push("/(tabs)/account")}
+              onPress={() => router.push('/auth/login')}
             >
               <Text className="text-center font-semibold text-background">ログイン</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* タブ切り替え */}
-        {isAuthenticated && (
+        {/* タブ切り替え（参加予定 / イベント一覧） */}
+        {user && (
           <View className="px-6 pb-4 flex-row gap-3">
             <TouchableOpacity
               className={`flex-1 py-3 rounded-xl border ${
@@ -85,18 +104,56 @@ export default function EventsScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               className={`flex-1 py-3 rounded-xl border ${
-                activeTab === "local" ? "bg-primary border-primary" : "bg-surface border-border"
+                activeTab === "list" ? "bg-primary border-primary" : "bg-surface border-border"
               }`}
-              onPress={() => setActiveTab("local")}
+              onPress={() => setActiveTab("list")}
             >
               <Text
                 className={`text-center font-semibold ${
-                  activeTab === "local" ? "text-background" : "text-foreground"
+                  activeTab === "list" ? "text-background" : "text-foreground"
                 }`}
               >
-                地域のイベント
+                イベント一覧
               </Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* セグメント切り替え（全国 / 地域） - イベント一覧タブのみ表示 */}
+        {user && activeTab === "list" && (
+          <View className="px-6 pb-4 flex-row gap-2">
+            <Pressable
+              onPress={() => setSegment("national")}
+              className={`flex-1 py-2 px-4 rounded-lg border ${
+                segment === "national"
+                  ? "bg-primary border-primary"
+                  : "bg-surface border-border"
+              }`}
+            >
+              <Text
+                className={`text-center font-semibold text-sm ${
+                  segment === "national" ? "text-background" : "text-foreground"
+                }`}
+              >
+                全国
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setSegment("region")}
+              className={`flex-1 py-2 px-4 rounded-lg border ${
+                segment === "region"
+                  ? "bg-primary border-primary"
+                  : "bg-surface border-border"
+              }`}
+            >
+              <Text
+                className={`text-center font-semibold text-sm ${
+                  segment === "region" ? "text-background" : "text-foreground"
+                }`}
+              >
+                地域
+              </Text>
+            </Pressable>
           </View>
         )}
 
@@ -105,8 +162,8 @@ export default function EventsScreen() {
           className="flex-1 px-6"
           refreshControl={
             <RefreshControl
-              refreshing={activeTab === "upcoming" ? ticketsRefreshing : eventsRefreshing}
-              onRefresh={activeTab === "upcoming" ? onRefreshTickets : onRefreshEvents}
+              refreshing={activeTab === "upcoming" ? ticketsRefreshing : refreshing}
+              onRefresh={activeTab === "upcoming" ? onRefreshTickets : onRefresh}
               tintColor={colors.primary}
             />
           }
@@ -176,13 +233,13 @@ export default function EventsScreen() {
                 <Text className="text-muted">参加予定のイベントがありません</Text>
               </View>
             )
-          ) : eventsLoading ? (
+          ) : isLoading ? (
             <View className="py-8 items-center">
               <ActivityIndicator size="large" />
             </View>
-          ) : localEvents && localEvents.length > 0 ? (
+          ) : eventData && eventData.length > 0 ? (
             <View className="gap-4 pb-6">
-              {localEvents.map((event) => (
+              {eventData.map((event) => (
                 <TouchableOpacity
                   key={event.id}
                   className="bg-surface rounded-2xl overflow-hidden border border-border"
@@ -224,7 +281,9 @@ export default function EventsScreen() {
             </View>
           ) : (
             <View className="py-8 items-center">
-              <Text className="text-muted">地域のイベントがまだありません</Text>
+              <Text className="text-muted">
+                {segment === "national" ? "全国のイベント" : "地域のイベント"}がまだありません
+              </Text>
             </View>
           )}
         </ScrollView>

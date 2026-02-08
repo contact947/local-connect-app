@@ -1,7 +1,7 @@
-import { ScrollView, Text, View, TouchableOpacity, RefreshControl, FlatList, ActivityIndicator } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, RefreshControl, FlatList, ActivityIndicator, Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/use-auth";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { router } from "expo-router";
 import { useState, useCallback } from "react";
 
@@ -13,30 +13,48 @@ const categories = [
   { label: "インタビュー", value: "interview" as const },
 ];
 
+type Segment = "national" | "region";
+
 export default function NewsScreen() {
-  const { isAuthenticated } = useAuth();
+  const { user, profile } = useFirebaseAuthContext();
+  const [segment, setSegment] = useState<Segment>("national");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: newsData = [], isLoading, refetch } = trpc.articles.list.useQuery(
+  // 全国のニュース取得
+  const { data: nationalNews = [], isLoading: loadingNational, refetch: refetchNational } = trpc.articles.list.useQuery(
     {
       category: selectedCategory === "all" ? undefined : (selectedCategory as "event" | "interview" | "other" | "store" | "column"),
     },
     {
-      enabled: isAuthenticated,
+      enabled: !!user && segment === "national",
     }
   );
+
+  // 地域のニュース取得
+  const { data: regionNews = [], isLoading: loadingRegion, refetch: refetchRegion } = trpc.articles.list.useQuery(
+    {
+      category: selectedCategory === "all" ? undefined : (selectedCategory as "event" | "interview" | "other" | "store" | "column"),
+      prefecture: profile?.address?.split(" ")[0] || undefined,
+    },
+    {
+      enabled: !!user && segment === "region" && !!profile?.address,
+    }
+  );
+
+  const newsData = segment === "national" ? nationalNews : regionNews;
+  const isLoading = segment === "national" ? loadingNational : loadingRegion;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await refetch();
+      await Promise.all([refetchNational(), refetchRegion()]);
     } finally {
       setRefreshing(false);
     }
-  }, [refetch]);
+  }, [refetchNational, refetchRegion]);
 
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <ScreenContainer className="justify-center items-center p-6">
         <Text className="text-2xl font-bold text-foreground mb-4">ニュース</Text>
@@ -64,7 +82,45 @@ export default function NewsScreen() {
             {/* ヘッダー */}
             <View className="mb-4">
               <Text className="text-3xl font-bold text-foreground">ニュース</Text>
-              <Text className="text-muted mt-1">全国の最新情報</Text>
+              <Text className="text-muted mt-1">
+                {segment === "national" ? "全国の最新情報" : "地域の最新情報"}
+              </Text>
+            </View>
+
+            {/* セグメントコントロール */}
+            <View className="flex-row gap-2 mb-4">
+              <Pressable
+                onPress={() => setSegment("national")}
+                className={`flex-1 py-2 px-4 rounded-lg border ${
+                  segment === "national"
+                    ? "bg-primary border-primary"
+                    : "bg-surface border-border"
+                }`}
+              >
+                <Text
+                  className={`text-center font-semibold text-sm ${
+                    segment === "national" ? "text-background" : "text-foreground"
+                  }`}
+                >
+                  全国
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setSegment("region")}
+                className={`flex-1 py-2 px-4 rounded-lg border ${
+                  segment === "region"
+                    ? "bg-primary border-primary"
+                    : "bg-surface border-border"
+                }`}
+              >
+                <Text
+                  className={`text-center font-semibold text-sm ${
+                    segment === "region" ? "text-background" : "text-foreground"
+                  }`}
+                >
+                  地域
+                </Text>
+              </Pressable>
             </View>
 
             {/* カテゴリフィルター */}
