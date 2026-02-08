@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert, RefreshControl, Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
@@ -26,16 +26,32 @@ export default function EventsScreen() {
     }
   );
 
-  // 地域のイベント取得
-  const { data: regionEvents, isLoading: regionLoading, refetch: refetchRegionEvents } = trpc.events.list.useQuery(
+  // 地域のイベント取得（全イベント取得）
+  const { data: allRegionEvents, isLoading: regionLoading, refetch: refetchRegionEvents } = trpc.events.list.useQuery(
     {
-      prefecture: profile?.address?.split(" ")[0] || undefined,
-      limit: 20,
+      limit: 50,
     },
     {
       enabled: !!user && activeTab === "region" && !!profile?.address,
     }
   );
+
+  // ユーザーの登録県を抽出
+  const userPrefecture = useMemo(() => {
+    if (!profile?.address) return null;
+    // 住所の最初の要素が都道府県（例："東京都 渋谷区"）
+    return profile.address.split(" ")[0] || null;
+  }, [profile?.address]);
+
+  // 地域イベントをユーザーの県でフィルタリング
+  const regionEvents = useMemo(() => {
+    if (!allRegionEvents || !userPrefecture) return [];
+    return allRegionEvents.filter((event) => {
+      // イベント会場から都道府県を抽出
+      const eventPrefecture = event.venue?.split(" ")[0] || "";
+      return eventPrefecture === userPrefecture;
+    });
+  }, [allRegionEvents, userPrefecture]);
 
   // Pull to Refresh
   const { refreshing: nationalRefreshing, onRefresh: onRefreshNational } = usePullToRefresh(refetchNationalEvents);
@@ -45,7 +61,7 @@ export default function EventsScreen() {
     router.push(`/events/${eventId}`);
   };
 
-  const eventData = activeTab === "national" ? nationalEvents : regionEvents;
+  const eventData = activeTab === "national" ? nationalEvents : regionEvents || [];
   const isLoading = activeTab === "national" ? nationalLoading : regionLoading;
   const refreshing = activeTab === "national" ? nationalRefreshing : regionRefreshing;
   const onRefresh = activeTab === "national" ? onRefreshNational : onRefreshRegion;
@@ -177,7 +193,7 @@ export default function EventsScreen() {
             <View className="py-8 items-center">
               <ActivityIndicator size="large" />
             </View>
-          ) : eventData && eventData.length > 0 ? (
+          ) : eventData.length > 0 ? (
             <View className="gap-4 pb-6">
               {eventData.map((event) => (
                 <TouchableOpacity
