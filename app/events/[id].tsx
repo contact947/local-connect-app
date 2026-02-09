@@ -1,67 +1,86 @@
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Image } from "expo-image";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert, Pressable } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { QRCodeDisplayScreen } from "@/components/qr-code-display-screen";
 import { trpc } from "@/lib/trpc";
-import { useColors } from "@/hooks/use-colors";
-import { cn } from "@/lib/utils";
+import { router, useLocalSearchParams } from "expo-router";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { useState } from "react";
 
 export default function EventDetailScreen() {
-  const router = useRouter();
+  const { user } = useFirebaseAuthContext();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const colors = useColors();
-  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const eventId = id ? parseInt(id, 10) : null;
   const [quantity, setQuantity] = useState(1);
-  const [showQRCode, setShowQRCode] = useState(false);
-  const [qrCode, setQrCode] = useState<string | null>(null);
-
-  // QRコード表示時に輝度を最大に
-  const eventId = parseInt(id || "0", 10);
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
   // イベント詳細取得
   const { data: event, isLoading, error } = trpc.events.getById.useQuery(
-    { id: eventId },
-    { enabled: eventId > 0 }
+    { id: eventId! },
+    {
+      enabled: !!user && !!eventId,
+    }
   );
 
-  // チケット購入Mutation
-  const purchaseMutation = trpc.tickets.purchase.useMutation();
+  // チケット購入
+  const purchaseMutation = trpc.tickets.purchase.useMutation({
+    onSuccess: (data) => {
+      Alert.alert(
+        "購入成功",
+        `チケットを購入しました。\nQRコード: ${data.qrCode}`,
+        [{ text: "OK", onPress: () => router.back() }]
+      );
+    },
+    onError: (error) => {
+      Alert.alert("購入失敗", error.message || "チケットの購入に失敗しました");
+    },
+  });
 
   const handlePurchase = async () => {
     if (!event) return;
 
+    setIsPurchasing(true);
     try {
-      const result = await purchaseMutation.mutateAsync({
+      await purchaseMutation.mutateAsync({
         eventId: event.id,
         quantity,
       });
-
-      // 購入成功 - QRコード表示画面へ
-      setQrCode(result.qrCode);
-      setShowQRCode(true);
-      setShowPurchaseModal(false);
-    } catch (err) {
-      Alert.alert("エラー", `購入に失敗しました: ${err instanceof Error ? err.message : "不明なエラー"}`);
+    } finally {
+      setIsPurchasing(false);
     }
   };
 
+  if (!user) {
+    return (
+      <ScreenContainer className="justify-center items-center p-6">
+        <Text className="text-2xl font-bold text-foreground mb-4">イベント詳細</Text>
+        <Text className="text-muted text-center mb-6">ログインしてイベントを予約しましょう</Text>
+        <TouchableOpacity
+          className="bg-primary px-8 py-3 rounded-full"
+          onPress={() => router.push('/auth/welcome')}
+        >
+          <Text className="text-background font-semibold">ログイン</Text>
+        </TouchableOpacity>
+      </ScreenContainer>
+    );
+  }
+
   if (isLoading) {
     return (
-      <ScreenContainer className="items-center justify-center">
-        <ActivityIndicator size="large" color={colors.primary} />
+      <ScreenContainer className="justify-center items-center">
+        <ActivityIndicator size="large" />
       </ScreenContainer>
     );
   }
 
   if (error || !event) {
     return (
-      <ScreenContainer className="items-center justify-center p-4">
-        <Text className="text-lg font-semibold text-foreground mb-4">イベントが見つかりません</Text>
+      <ScreenContainer className="justify-center items-center p-6">
+        <Text className="text-2xl font-bold text-foreground mb-4">エラー</Text>
+        <Text className="text-muted text-center mb-6">
+          イベントを読み込めませんでした
+        </Text>
         <TouchableOpacity
+          className="bg-primary px-8 py-3 rounded-full"
           onPress={() => router.back()}
-          className="bg-primary px-6 py-3 rounded-full"
         >
           <Text className="text-background font-semibold">戻る</Text>
         </TouchableOpacity>
@@ -70,153 +89,172 @@ export default function EventDetailScreen() {
   }
 
   const eventDate = new Date(event.eventDate);
-  const formattedDate = eventDate.toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const isUpcoming = eventDate > new Date();
+  const availableTickets = event.availableTickets ?? null;
+  const canPurchase = isUpcoming && (availableTickets === null || availableTickets > 0);
 
   return (
-    <ScreenContainer className="flex-1" edges={["top", "left", "right"]}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
-        {/* ヘッダー画像 */}
-        {event.imageUrl && (
-          <Image
-            source={{ uri: event.imageUrl }}
-            style={{ width: "100%", height: 300 }}
-            contentFit="cover"
-          />
-        )}
+    <ScreenContainer>
+      <ScrollView className="flex-1">
+        <View className="px-6 py-4">
+          {/* ヘッダー */}
+          <TouchableOpacity
+            className="mb-6 flex-row items-center"
+            onPress={() => router.back()}
+          >
+            <Text className="text-primary font-semibold">← 戻る</Text>
+          </TouchableOpacity>
 
-        {/* コンテンツ */}
-        <View className="p-4 flex-1">
+          {/* 画像 */}
+          {event.imageUrl && (
+            <View className="mb-6 rounded-2xl overflow-hidden bg-muted h-64">
+              <Image
+                source={{ uri: event.imageUrl }}
+                className="w-full h-full"
+                resizeMode="cover"
+              />
+            </View>
+          )}
+
+          {/* ステータスバッジ */}
+          <View className="mb-4">
+            {!isUpcoming && (
+              <View className="bg-muted rounded-full px-3 py-1 self-start">
+                <Text className="text-foreground text-xs font-semibold">終了</Text>
+              </View>
+            )}
+            {availableTickets !== null && availableTickets === 0 && isUpcoming && (
+              <View className="bg-error rounded-full px-3 py-1 self-start">
+                <Text className="text-background text-xs font-semibold">売り切れ</Text>
+              </View>
+            )}
+          </View>
+
           {/* タイトル */}
-          <Text className="text-3xl font-bold text-foreground mb-2">{event.title}</Text>
-
-          {/* 地域情報 */}
-          <Text className="text-sm text-muted mb-4">
-            {event.prefecture} {event.city}
+          <Text className="text-3xl font-bold text-foreground mb-4">
+            {event.title}
           </Text>
 
           {/* イベント情報 */}
-          <View className="bg-surface rounded-lg p-4 mb-4 gap-3">
+          <View className="mb-6 space-y-4">
             {/* 開催日時 */}
-            <View className="flex-row items-center gap-3">
-              <Text className="text-sm font-semibold text-muted w-20">開催日時</Text>
-              <Text className="text-sm text-foreground flex-1">{formattedDate}</Text>
+            <View className="p-4 bg-surface rounded-xl border border-border">
+              <Text className="text-muted text-sm mb-2">開催日時</Text>
+              <Text className="text-foreground font-semibold text-base">
+                {eventDate.toLocaleDateString("ja-JP", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  weekday: "short",
+                })}
+              </Text>
+              <Text className="text-foreground font-semibold text-base">
+                {eventDate.toLocaleTimeString("ja-JP", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
             </View>
 
             {/* 会場 */}
-            <View className="flex-row items-center gap-3">
-              <Text className="text-sm font-semibold text-muted w-20">会場</Text>
-              <Text className="text-sm text-foreground flex-1">{event.venue}</Text>
+            <View className="p-4 bg-surface rounded-xl border border-border">
+              <Text className="text-muted text-sm mb-2">会場</Text>
+              <Text className="text-foreground font-semibold">{event.venue}</Text>
+              {(event.prefecture || event.city) && (
+                <Text className="text-muted text-sm mt-1">
+                  {event.prefecture}
+                  {event.city && ` ${event.city}`}
+                </Text>
+              )}
             </View>
 
-            {/* 価格 */}
-            <View className="flex-row items-center gap-3">
-              <Text className="text-sm font-semibold text-muted w-20">価格</Text>
-              <Text className="text-lg font-bold text-primary">¥{event.price}</Text>
+            {/* 料金 */}
+            <View className="p-4 bg-surface rounded-xl border border-border">
+              <Text className="text-muted text-sm mb-2">料金</Text>
+              <Text className="text-foreground font-semibold text-lg">
+                ¥{parseFloat(event.price).toLocaleString("ja-JP")}
+              </Text>
             </View>
 
-            {/* 残りチケット */}
-            {event.availableTickets !== null && (
-              <View className="flex-row items-center gap-3">
-                <Text className="text-sm font-semibold text-muted w-20">残数</Text>
-                <Text className="text-sm text-foreground">{event.availableTickets}枚</Text>
+            {/* チケット残数 */}
+            {availableTickets !== null && (
+              <View className="p-4 bg-surface rounded-xl border border-border">
+                <Text className="text-muted text-sm mb-2">チケット残数</Text>
+                <Text className="text-foreground font-semibold">
+                  {availableTickets} / {event.capacity}
+                </Text>
               </View>
             )}
           </View>
 
           {/* 説明 */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">説明</Text>
-            <Text className="text-sm text-muted leading-relaxed">{event.description}</Text>
+          <View className="mb-8">
+            <Text className="text-foreground leading-relaxed text-base">
+              {event.description}
+            </Text>
           </View>
+
+          {/* 購入セクション */}
+          {canPurchase && (
+            <View className="mb-8 p-6 bg-surface rounded-xl border border-border">
+              <Text className="text-foreground font-semibold mb-4">チケットを購入</Text>
+
+              {/* 数量選択 */}
+              <View className="flex-row items-center mb-6">
+                <Text className="text-foreground mr-4">枚数:</Text>
+                <Pressable
+                  onPress={() => quantity > 1 && setQuantity(quantity - 1)}
+                  className="bg-border rounded-lg px-3 py-2 mr-2"
+                >
+                  <Text className="text-foreground font-semibold">−</Text>
+                </Pressable>
+                <Text className="text-foreground font-semibold text-lg w-8 text-center">
+                  {quantity}
+                </Text>
+                <Pressable
+                  onPress={() => quantity < 10 && setQuantity(quantity + 1)}
+                  className="bg-border rounded-lg px-3 py-2 ml-2"
+                >
+                  <Text className="text-foreground font-semibold">+</Text>
+                </Pressable>
+              </View>
+
+              {/* 合計金額 */}
+              <View className="mb-6 p-4 bg-background rounded-lg">
+                <View className="flex-row justify-between mb-2">
+                  <Text className="text-muted">小計</Text>
+                  <Text className="text-foreground font-semibold">
+                    ¥{(parseFloat(event.price) * quantity).toLocaleString("ja-JP")}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 購入ボタン */}
+              <TouchableOpacity
+                className="bg-primary py-4 rounded-xl active:opacity-80"
+                onPress={handlePurchase}
+                disabled={isPurchasing || purchaseMutation.isPending}
+              >
+                {isPurchasing || purchaseMutation.isPending ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text className="text-background font-semibold text-center text-lg">
+                    購入する
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {!canPurchase && (
+            <View className="mb-8 p-6 bg-surface rounded-xl border border-border items-center">
+              <Text className="text-muted">
+                {!isUpcoming ? "このイベントは終了しました" : "チケットは売り切れです"}
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
-
-      {/* 固定購入ボタン */}
-      <View className="p-4 border-t border-border bg-background">
-        <TouchableOpacity
-          onPress={() => setShowPurchaseModal(true)}
-          className="bg-primary py-4 rounded-full items-center active:opacity-80"
-        >
-          <Text className="text-background font-bold text-lg">チケットを購入する</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* QRコード表示画面 */}
-      {showQRCode && qrCode && (
-        <QRCodeDisplayScreen qrCode={qrCode} onClose={() => {
-          setShowQRCode(false);
-          router.back();
-        }} />
-      )}
-
-      {/* 購入モーダル */}
-      {showPurchaseModal && (
-        <View className="absolute inset-0 bg-black/50 items-center justify-center">
-          <View className="bg-background rounded-2xl p-6 w-80 gap-4">
-            <Text className="text-2xl font-bold text-foreground">チケット購入</Text>
-
-            {/* 枚数選択 */}
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">枚数を選択</Text>
-              <View className="flex-row items-center gap-3">
-                <TouchableOpacity
-                  onPress={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="bg-surface px-4 py-2 rounded-lg"
-                >
-                  <Text className="text-foreground font-bold">−</Text>
-                </TouchableOpacity>
-                <Text className="text-lg font-bold text-foreground flex-1 text-center">{quantity}枚</Text>
-                <TouchableOpacity
-                  onPress={() => setQuantity(Math.min(10, quantity + 1))}
-                  className="bg-surface px-4 py-2 rounded-lg"
-                >
-                  <Text className="text-foreground font-bold">+</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* 合計金額 */}
-            <View className="bg-surface rounded-lg p-3">
-              <View className="flex-row justify-between items-center">
-                <Text className="text-sm text-muted">合計金額</Text>
-                <Text className="text-2xl font-bold text-primary">
-                  ¥{(parseFloat(event.price) * quantity).toLocaleString()}
-                </Text>
-              </View>
-            </View>
-
-            {/* ボタン */}
-            <View className="flex-row gap-3">
-              <TouchableOpacity
-                onPress={() => setShowPurchaseModal(false)}
-                className="flex-1 bg-surface py-3 rounded-lg items-center"
-              >
-                <Text className="text-foreground font-semibold">キャンセル</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handlePurchase}
-                disabled={purchaseMutation.isPending}
-                className={cn(
-                  "flex-1 py-3 rounded-lg items-center",
-                  purchaseMutation.isPending ? "bg-muted" : "bg-primary"
-                )}
-              >
-                {purchaseMutation.isPending ? (
-                  <ActivityIndicator color={colors.background} />
-                ) : (
-                  <Text className="text-background font-bold">購入確定</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
     </ScreenContainer>
   );
 }
