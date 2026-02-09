@@ -64,7 +64,11 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
-    permissions: ["POST_NOTIFICATIONS"],
+    permissions: [
+      "INTERNET",              // Firebase、API呼び出しなどのネットワーク接続に必須
+      "ACCESS_NETWORK_STATE",  // ネットワーク状態確認に必須
+      "POST_NOTIFICATIONS",    // プッシュ通知に必須
+    ],
     intentFilters: [
       {
         action: "VIEW",

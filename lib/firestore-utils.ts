@@ -9,7 +9,9 @@ import {
   where,
   getDocs,
   Timestamp,
+  FirestoreError,
 } from "firebase/firestore";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface UserProfile {
   uid: string;
@@ -28,7 +30,21 @@ export interface UserProfile {
 }
 
 /**
+ * ネットワークエラーかどうかを判定
+ */
+function isNetworkError(error: unknown): boolean {
+  if (error instanceof FirestoreError) {
+    return error.code === 'unavailable' || 
+           error.code === 'unauthenticated' ||
+           error.message.includes('offline') ||
+           error.message.includes('network');
+  }
+  return false;
+}
+
+/**
  * ユーザープロフィールを Firestore から取得
+ * オフライン時はローカルキャッシュから取得
  */
 export async function getUserProfileFromFirestore(uid: string): Promise<UserProfile | null> {
   try {
@@ -36,11 +52,30 @@ export async function getUserProfileFromFirestore(uid: string): Promise<UserProf
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return docSnap.data() as UserProfile;
+      const profile = docSnap.data() as UserProfile;
+      // キャッシュに保存
+      await AsyncStorage.setItem(`user_profile_${uid}`, JSON.stringify(profile));
+      return profile;
     }
     return null;
   } catch (error) {
-    console.error("Error fetching user profile:", error);
+    console.warn("Error fetching user profile from Firestore:", error);
+    
+    // ネットワークエラーの場合、ローカルキャッシュから取得
+    if (isNetworkError(error)) {
+      try {
+        const cachedProfile = await AsyncStorage.getItem(`user_profile_${uid}`);
+        if (cachedProfile) {
+          console.log("Using cached user profile");
+          return JSON.parse(cachedProfile) as UserProfile;
+        }
+      } catch (cacheError) {
+        console.warn("Error reading cache:", cacheError);
+      }
+      return null; // キャッシュもない場合はnullを返す
+    }
+    
+    // その他のエラーはthrow
     throw error;
   }
 }
@@ -92,6 +127,7 @@ export async function updateUserProfileInFirestore(
 
 /**
  * メールアドレスからユーザープロフィールを検索
+ * オフライン時はローカルキャッシュから検索
  */
 export async function getUserProfileByEmail(email: string): Promise<UserProfile | null> {
   try {
@@ -102,24 +138,61 @@ export async function getUserProfileByEmail(email: string): Promise<UserProfile 
       return null;
     }
 
-    return querySnapshot.docs[0].data() as UserProfile;
+    const profile = querySnapshot.docs[0].data() as UserProfile;
+    // キャッシュに保存
+    await AsyncStorage.setItem(`user_profile_email_${email}`, JSON.stringify(profile));
+    return profile;
   } catch (error) {
-    console.error("Error fetching user profile by email:", error);
+    console.warn("Error fetching user profile by email:", error);
+    
+    // ネットワークエラーの場合、ローカルキャッシュから取得
+    if (isNetworkError(error)) {
+      try {
+        const cachedProfile = await AsyncStorage.getItem(`user_profile_email_${email}`);
+        if (cachedProfile) {
+          console.log("Using cached user profile by email");
+          return JSON.parse(cachedProfile) as UserProfile;
+        }
+      } catch (cacheError) {
+        console.warn("Error reading cache:", cacheError);
+      }
+      return null;
+    }
+    
     throw error;
   }
 }
 
 /**
  * 都道府県からユーザープロフィール一覧を取得
+ * オフライン時はローカルキャッシュから取得
  */
 export async function getUserProfilesByPrefecture(prefecture: string): Promise<UserProfile[]> {
   try {
     const q = query(collection(db, "users"), where("prefecture", "==", prefecture));
     const querySnapshot = await getDocs(q);
 
-    return querySnapshot.docs.map((doc) => doc.data() as UserProfile);
+    const profiles = querySnapshot.docs.map((doc) => doc.data() as UserProfile);
+    // キャッシュに保存
+    await AsyncStorage.setItem(`user_profiles_prefecture_${prefecture}`, JSON.stringify(profiles));
+    return profiles;
   } catch (error) {
-    console.error("Error fetching user profiles by prefecture:", error);
+    console.warn("Error fetching user profiles by prefecture:", error);
+    
+    // ネットワークエラーの場合、ローカルキャッシュから取得
+    if (isNetworkError(error)) {
+      try {
+        const cachedProfiles = await AsyncStorage.getItem(`user_profiles_prefecture_${prefecture}`);
+        if (cachedProfiles) {
+          console.log("Using cached user profiles by prefecture");
+          return JSON.parse(cachedProfiles) as UserProfile[];
+        }
+      } catch (cacheError) {
+        console.warn("Error reading cache:", cacheError);
+      }
+      return []; // キャッシュもない場合は空配列を返す
+    }
+    
     throw error;
   }
 }
