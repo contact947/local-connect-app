@@ -1,81 +1,92 @@
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Image } from "expo-image";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
-import { QRCodeDisplay } from "@/components/qr-code-display";
-import { QRCodeDisplayScreen } from "@/components/qr-code-display-screen";
 import { trpc } from "@/lib/trpc";
-import { useColors } from "@/hooks/use-colors";
-import { cn } from "@/lib/utils";
+import { router, useLocalSearchParams } from "expo-router";
+import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { useState } from "react";
 
 export default function GiftDetailScreen() {
-  const router = useRouter();
+  const { user } = useFirebaseAuthContext();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const colors = useColors();
-  const [showQRCode, setShowQRCode] = useState(false);
-  const [qrCode, setQrCode] = useState<string | null>(null);
-
-  const giftId = parseInt(id || "0", 10);
+  const giftId = id ? parseInt(id, 10) : null;
+  const [isUsing, setIsUsing] = useState(false);
 
   // ギフト詳細取得
-  const { data: gift, isLoading: giftLoading } = trpc.gifts.getById.useQuery(
-    { id: giftId },
-    { enabled: giftId > 0 }
+  const { data: gift, isLoading, error } = trpc.gifts.getById.useQuery(
+    { id: giftId! },
+    {
+      enabled: !!user && !!giftId,
+    }
   );
 
-  // ギフト使用可能状況確認
-  const { data: usageStatus } = trpc.gifts.checkUsage.useQuery(
-    { giftId },
-    { enabled: giftId > 0 }
+  // ギフト利用可能状態確認
+  const { data: usageStatus, isLoading: isCheckingUsage } = trpc.gifts.checkUsage.useQuery(
+    { giftId: giftId! },
+    {
+      enabled: !!user && !!giftId,
+    }
   );
 
   // ギフト使用Mutation
-  const useMutation = trpc.gifts.use.useMutation();
+  const useMutation = trpc.gifts.use.useMutation({
+    onSuccess: (data) => {
+      Alert.alert(
+        "ギフト使用成功",
+        `ギフトを使用しました。\nQRコード: ${data.qrCode}`,
+        [{ text: "OK", onPress: () => router.back() }]
+      );
+    },
+    onError: (error) => {
+      Alert.alert("ギフト使用失敗", error.message || "ギフトの使用に失敗しました");
+    },
+  });
 
   const handleUseGift = async () => {
-    if (!gift) return;
+    if (!gift || !usageStatus?.canUse) return;
 
-    Alert.alert(
-      "ギフトを使用しますか？",
-      `${gift.giftTitle}\nこの操作は取り消せません。`,
-      [
-        { text: "キャンセル", style: "cancel" },
-        {
-          text: "使用する",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const result = await useMutation.mutateAsync({ giftId: gift.id });
-              setQrCode(result.qrCode);
-              setShowQRCode(true);
-            } catch (err) {
-              Alert.alert(
-                "エラー",
-                `ギフト使用に失敗しました: ${err instanceof Error ? err.message : "不明なエラー"}`
-              );
-            }
-          },
-        },
-      ]
-    );
+    setIsUsing(true);
+    try {
+      await useMutation.mutateAsync({
+        giftId: gift.id,
+      });
+    } finally {
+      setIsUsing(false);
+    }
   };
 
-  if (giftLoading) {
+  if (!user) {
     return (
-      <ScreenContainer className="items-center justify-center">
-        <ActivityIndicator size="large" color={colors.primary} />
+      <ScreenContainer className="justify-center items-center p-6">
+        <Text className="text-2xl font-bold text-foreground mb-4">ギフト詳細</Text>
+        <Text className="text-muted text-center mb-6">ログインしてギフトを利用しましょう</Text>
+        <TouchableOpacity
+          className="bg-primary px-8 py-3 rounded-full"
+          onPress={() => router.push('/auth/welcome')}
+        >
+          <Text className="text-background font-semibold">ログイン</Text>
+        </TouchableOpacity>
       </ScreenContainer>
     );
   }
 
-  if (!gift) {
+  if (isLoading || isCheckingUsage) {
     return (
-      <ScreenContainer className="items-center justify-center p-4">
-        <Text className="text-lg font-semibold text-foreground mb-4">ギフトが見つかりません</Text>
+      <ScreenContainer className="justify-center items-center">
+        <ActivityIndicator size="large" />
+      </ScreenContainer>
+    );
+  }
+
+  if (error || !gift || !usageStatus) {
+    return (
+      <ScreenContainer className="justify-center items-center p-6">
+        <Text className="text-2xl font-bold text-foreground mb-4">エラー</Text>
+        <Text className="text-muted text-center mb-6">
+          ギフトを読み込めませんでした
+        </Text>
         <TouchableOpacity
+          className="bg-primary px-8 py-3 rounded-full"
           onPress={() => router.back()}
-          className="bg-primary px-6 py-3 rounded-full"
         >
           <Text className="text-background font-semibold">戻る</Text>
         </TouchableOpacity>
@@ -83,148 +94,164 @@ export default function GiftDetailScreen() {
     );
   }
 
-  const expiryDate = gift.expiryDate ? new Date(gift.expiryDate) : new Date();
-  const formattedExpiry = expiryDate.toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const isExpired = gift.expiryDate ? expiryDate < new Date() : false;
-  const canUse = usageStatus?.canUse && !isExpired;
+  const isExpired = gift.expiryDate && new Date(gift.expiryDate) < new Date();
 
   return (
-    <ScreenContainer className="flex-1" edges={["top", "left", "right"]}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="flex-1">
-        {/* ギフト画像 */}
-        {gift.imageUrl && (
-          <Image
-            source={{ uri: gift.imageUrl }}
-            style={{ width: "100%", height: 250 }}
-            contentFit="cover"
-          />
-        )}
+    <ScreenContainer>
+      <ScrollView className="flex-1">
+        <View className="px-6 py-4">
+          {/* ヘッダー */}
+          <TouchableOpacity
+            className="mb-6 flex-row items-center"
+            onPress={() => router.back()}
+          >
+            <Text className="text-primary font-semibold">← 戻る</Text>
+          </TouchableOpacity>
 
-        {/* コンテンツ */}
-        <View className="p-4 flex-1">
+          {/* 画像 */}
+          {gift.imageUrl && (
+            <View className="mb-6 rounded-2xl overflow-hidden bg-muted h-64">
+              <Image
+                source={{ uri: gift.imageUrl }}
+                className="w-full h-full"
+                resizeMode="cover"
+              />
+            </View>
+          )}
+
+          {/* ステータスバッジ */}
+          <View className="mb-4 flex-row gap-2">
+            {isExpired && (
+              <View className="bg-error rounded-full px-3 py-1">
+                <Text className="text-background text-xs font-semibold">期限切れ</Text>
+              </View>
+            )}
+            {!usageStatus.canUse && !isExpired && (
+              <View className="bg-warning rounded-full px-3 py-1">
+                <Text className="text-background text-xs font-semibold">利用上限に達しました</Text>
+              </View>
+            )}
+            {usageStatus.canUse && (
+              <View className="bg-success rounded-full px-3 py-1">
+                <Text className="text-background text-xs font-semibold">利用可能</Text>
+              </View>
+            )}
+          </View>
+
           {/* タイトル */}
-          <Text className="text-3xl font-bold text-foreground mb-2">{gift.giftTitle}</Text>
+          <Text className="text-3xl font-bold text-foreground mb-2">
+            {gift.giftTitle}
+          </Text>
 
           {/* 店舗名 */}
-          <Text className="text-lg font-semibold text-primary mb-4">{gift.storeName}</Text>
-
-          {/* ステータス */}
-          {isExpired && (
-            <View className="bg-error/10 border border-error rounded-lg p-3 mb-4">
-              <Text className="text-sm font-semibold text-error">有効期限が切れています</Text>
-            </View>
-          )}
-
-          {!canUse && !isExpired && (
-            <View className="bg-warning/10 border border-warning rounded-lg p-3 mb-4">
-              <Text className="text-sm font-semibold text-warning">
-                使用回数の上限に達しています
-              </Text>
-            </View>
-          )}
+          <Text className="text-lg text-muted mb-6">
+            {gift.storeName}
+          </Text>
 
           {/* ギフト情報 */}
-          <View className="bg-surface rounded-lg p-4 mb-4 gap-3">
+          <View className="mb-6 space-y-4">
             {/* 説明 */}
-            <View>
-              <Text className="text-sm font-semibold text-muted mb-1">特典内容</Text>
-              <Text className="text-sm text-foreground">{gift.description}</Text>
+            <View className="p-4 bg-surface rounded-xl border border-border">
+              <Text className="text-foreground leading-relaxed">
+                {gift.description}
+              </Text>
             </View>
 
             {/* 住所 */}
-            <View>
-              <Text className="text-sm font-semibold text-muted mb-1">住所</Text>
-              <Text className="text-sm text-foreground">{gift.address}</Text>
-            </View>
-
-            {/* 有効期限 */}
-            <View className="flex-row justify-between items-center">
-              <Text className="text-sm font-semibold text-muted">有効期限</Text>
-              <Text className={cn("text-sm font-semibold", isExpired ? "text-error" : "text-foreground")}>
-                {formattedExpiry}
-              </Text>
-            </View>
-
-            {/* 使用可能回数 */}
-            {usageStatus && (
-              <View className="flex-row justify-between items-center">
-                <Text className="text-sm font-semibold text-muted">使用可能回数</Text>
-                <Text className="text-sm text-foreground">
-                  {usageStatus.usageLimit - usageStatus.usageCount}/{usageStatus.usageLimit}
+            {(gift.prefecture || gift.city || gift.address) && (
+              <View className="p-4 bg-surface rounded-xl border border-border">
+                <Text className="text-muted text-sm mb-2">住所</Text>
+                <Text className="text-foreground font-semibold">
+                  {gift.prefecture}
+                  {gift.city && ` ${gift.city}`}
+                  {gift.address && ` ${gift.address}`}
                 </Text>
               </View>
             )}
+
+            {/* 有効期限 */}
+            {gift.expiryDate && (
+              <View className="p-4 bg-surface rounded-xl border border-border">
+                <Text className="text-muted text-sm mb-2">有効期限</Text>
+                <Text className={`text-foreground font-semibold ${isExpired ? 'text-error' : ''}`}>
+                  {new Date(gift.expiryDate).toLocaleDateString("ja-JP", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </Text>
+              </View>
+            )}
+
+            {/* 利用上限 */}
+            <View className="p-4 bg-surface rounded-xl border border-border">
+              <Text className="text-muted text-sm mb-2">利用状況</Text>
+              <View className="flex-row justify-between items-center">
+                <Text className="text-foreground font-semibold">
+                  {usageStatus.usageCount} / {usageStatus.usageLimit} 回
+                </Text>
+                <View className="flex-1 ml-4 bg-border rounded-full h-2 overflow-hidden">
+                  <View
+                    className="bg-primary h-full"
+                    style={{
+                      width: `${(usageStatus.usageCount / usageStatus.usageLimit) * 100}%`,
+                    }}
+                  />
+                </View>
+              </View>
+            </View>
 
             {/* 年齢制限 */}
             {gift.ageRestriction && (
-              <View className="flex-row justify-between items-center">
-                <Text className="text-sm font-semibold text-muted">年齢制限</Text>
-                <Text className="text-sm text-foreground">{gift.ageRestriction}歳以上</Text>
+              <View className="p-4 bg-surface rounded-xl border border-border">
+                <Text className="text-muted text-sm mb-2">年齢制限</Text>
+                <Text className="text-foreground font-semibold">
+                  {gift.ageRestriction}才以上
+                </Text>
               </View>
             )}
 
-            {/* 学校区分制限 */}
+            {/* 学校種別制限 */}
             {gift.schoolTypeRestriction && gift.schoolTypeRestriction !== "none" && (
-              <View className="flex-row justify-between items-center">
-                <Text className="text-sm font-semibold text-muted">対象</Text>
-                <Text className="text-sm text-foreground">
-                  {gift.schoolTypeRestriction === "high_school"
-                    ? "高校生"
-                    : gift.schoolTypeRestriction === "university"
-                      ? "大学生"
-                      : gift.schoolTypeRestriction === "working"
-                        ? "新社会人"
-                        : "その他"}
+              <View className="p-4 bg-surface rounded-xl border border-border">
+                <Text className="text-muted text-sm mb-2">対象者</Text>
+                <Text className="text-foreground font-semibold">
+                  {gift.schoolTypeRestriction === "high_school" && "高校生"}
+                  {gift.schoolTypeRestriction === "university" && "大学生"}
+                  {gift.schoolTypeRestriction === "working" && "社会人"}
                 </Text>
               </View>
             )}
           </View>
 
-          {/* 利用条件 */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-2">利用条件</Text>
-            <Text className="text-xs text-muted leading-relaxed">
-              • このギフトは1回限りの使用です
-              {"\n"}• 有効期限内にのみ使用できます
-              {"\n"}• 払い戻しはできません
-              {"\n"}• 他のキャンペーンとの併用はできません
-            </Text>
-          </View>
+          {/* ギフト使用ボタン */}
+          {usageStatus.canUse && !isExpired && (
+            <View className="mb-8">
+              <TouchableOpacity
+                className="bg-primary py-4 rounded-xl active:opacity-80"
+                onPress={handleUseGift}
+                disabled={isUsing || useMutation.isPending}
+              >
+                {isUsing || useMutation.isPending ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text className="text-background font-semibold text-center text-lg">
+                    ギフトを使用する
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {!usageStatus.canUse && (
+            <View className="mb-8 p-6 bg-surface rounded-xl border border-border items-center">
+              <Text className="text-muted">
+                {isExpired ? "このギフトは期限切れです" : "このギフトの利用上限に達しました"}
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
-
-      {/* 固定使用ボタン */}
-      <View className="p-4 border-t border-border bg-background">
-        <TouchableOpacity
-          onPress={handleUseGift}
-          disabled={!canUse || useMutation.isPending}
-          className={cn(
-            "py-4 rounded-full items-center",
-            canUse && !useMutation.isPending ? "bg-primary" : "bg-muted"
-          )}
-        >
-          {useMutation.isPending ? (
-            <ActivityIndicator color={colors.background} />
-          ) : (
-            <Text className={cn("font-bold text-lg", canUse ? "text-background" : "text-muted")}>
-              {isExpired ? "有効期限切れ" : !canUse ? "使用不可" : "このギフトを使用する"}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* QRコード表示画面 */}
-      {showQRCode && qrCode && (
-        <QRCodeDisplayScreen qrCode={qrCode} onClose={() => {
-          setShowQRCode(false);
-          router.back();
-        }} />
-      )}
     </ScreenContainer>
   );
 }
