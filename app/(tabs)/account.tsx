@@ -264,12 +264,15 @@ export default function AccountScreen() {
                         key={option.value}
                         onPress={() => setFormData({ ...formData, gender: option.value })}
                         disabled={isSaving}
-                        className={`flex-1 py-2 rounded-lg border ${
+                        className={`flex-1 py-3 px-3 rounded-lg border flex-row items-center justify-center gap-2 ${
                           formData.gender === option.value
                             ? "bg-primary border-primary"
                             : "bg-surface border-border"
                         }`}
                       >
+                        {formData.gender === option.value && (
+                          <Text className="text-white text-lg font-bold">✓</Text>
+                        )}
                         <Text
                           className={`text-center text-sm font-semibold ${
                             formData.gender === option.value ? "text-white" : "text-foreground"
@@ -288,11 +291,18 @@ export default function AccountScreen() {
                   <Pressable
                     onPress={() => setShowPrefectureModal(true)}
                     disabled={isSaving}
-                    className="bg-surface rounded-lg p-3 border border-border flex-row justify-between items-center active:opacity-70"
+                    className={`bg-surface rounded-lg p-3 border flex-row justify-between items-center active:opacity-70 ${
+                      formData.prefecture ? "border-primary bg-primary/5" : "border-border"
+                    }`}
                   >
-                    <Text className={formData.prefecture ? "text-foreground" : "text-muted"}>
-                      {formData.prefecture || "選択してください"}
-                    </Text>
+                    <View className="flex-row items-center gap-2 flex-1">
+                      {formData.prefecture && (
+                        <Text className="text-primary text-lg font-bold">✓</Text>
+                      )}
+                      <Text className={formData.prefecture ? "text-foreground font-semibold" : "text-muted"}>
+                        {formData.prefecture || "選択してください"}
+                      </Text>
+                    </View>
                     <Text className="text-foreground">▼</Text>
                   </Pressable>
                 </View>
@@ -304,12 +314,17 @@ export default function AccountScreen() {
                     onPress={() => setShowCityModal(true)}
                     disabled={isSaving || !formData.prefecture}
                     className={`bg-surface rounded-lg p-3 border flex-row justify-between items-center active:opacity-70 ${
-                      formData.prefecture ? "border-border" : "border-border opacity-50"
+                      formData.city ? "border-primary bg-primary/5" : formData.prefecture ? "border-border" : "border-border opacity-50"
                     }`}
                   >
-                    <Text className={formData.city ? "text-foreground" : "text-muted"}>
-                      {formData.city || "都道府県を選択してください"}
-                    </Text>
+                    <View className="flex-row items-center gap-2 flex-1">
+                      {formData.city && (
+                        <Text className="text-primary text-lg font-bold">✓</Text>
+                      )}
+                      <Text className={formData.city ? "text-foreground font-semibold" : "text-muted"}>
+                        {formData.city || "都道府県を選択してください"}
+                      </Text>
+                    </View>
                     <Text className="text-foreground">▼</Text>
                   </Pressable>
                 </View>
