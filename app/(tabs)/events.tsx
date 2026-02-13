@@ -12,7 +12,7 @@ type EventTab = "region" | "national";
 export default function EventsScreen() {
   const colors = useColors();
   const { user, profile } = useFirebaseAuthContext();
-  const [activeTab, setActiveTab] = useState<EventTab>("region");
+  const [activeTab, setActiveTab] = useState<EventTab>("national");
 
 
 
