@@ -80,25 +80,48 @@ export default function AccountScreen() {
   const handleSave = async () => {
     if (!user) return;
 
+    if (!formData.name.trim()) {
+      Alert.alert("エラー", "氏名を入力してください");
+      return;
+    }
+
+    if (!formData.prefecture) {
+      Alert.alert("エラー", "都道府県を選択してください");
+      return;
+    }
+
+    if (!formData.city) {
+      Alert.alert("エラー", "市区町村を選択してください");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const fullAddress = `${formData.prefecture}${formData.city}`;
-      await updateUserProfileInFirestore(user.uid, {
-        name: formData.name,
+      const updateData = {
+        name: formData.name.trim(),
         age: formData.age ? parseInt(formData.age) : undefined,
         gender: formData.gender as "male" | "female" | "other" | "prefer_not_to_say",
         address: fullAddress,
-        occupation: formData.occupation,
-      });
+        occupation: formData.occupation.trim(),
+      };
 
-      // プロフィール再取得
+      console.log("Updating profile with data:", updateData);
+      await updateUserProfileInFirestore(user.uid, updateData);
+
       const updatedData = await getUserProfileFromFirestore(user.uid);
-      setProfile(updatedData);
-      setIsEditing(false);
-      Alert.alert("成功", "プロフィールを更新しました");
-    } catch (error) {
-      Alert.alert("エラー", "プロフィール更新に失敗しました");
-      console.error(error);
+      if (updatedData) {
+        setProfile(updatedData);
+        setIsEditing(false);
+        Alert.alert("成功", "プロフィールを更新しました");
+      } else {
+        Alert.alert("警告", "プロフィールは更新されましたが、再取得に失敗しました");
+        setIsEditing(false);
+      }
+    } catch (error: any) {
+      console.error("Profile update error:", error);
+      const errorMessage = error?.message || "プロフィール更新に失敗しました";
+      Alert.alert("エラー", errorMessage);
     } finally {
       setIsSaving(false);
     }

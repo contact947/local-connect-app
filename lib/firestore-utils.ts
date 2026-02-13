@@ -106,6 +106,7 @@ export async function createUserProfileInFirestore(
 
 /**
  * ユーザープロフィールを Firestore で更新
+ * オフライン時はローカルキャッシュを更新し、オンライン復帰時に同期される
  */
 export async function updateUserProfileInFirestore(
   uid: string,
@@ -119,8 +120,45 @@ export async function updateUserProfileInFirestore(
       ...data,
       updatedAt: now,
     });
+    
+    // 更新成功時、キャッシュも更新
+    try {
+      const cachedProfile = await AsyncStorage.getItem(`user_profile_${uid}`);
+      if (cachedProfile) {
+        const profile = JSON.parse(cachedProfile) as UserProfile;
+        const updatedProfile = {
+          ...profile,
+          ...data,
+          updatedAt: now.toDate().toISOString(),
+        };
+        await AsyncStorage.setItem(`user_profile_${uid}`, JSON.stringify(updatedProfile));
+      }
+    } catch (cacheError) {
+      console.warn("Error updating cache:", cacheError);
+    }
   } catch (error) {
     console.error("Error updating user profile:", error);
+    
+    // ネットワークエラーの場合、ローカルキャッシュを更新
+    if (isNetworkError(error)) {
+      try {
+        const cachedProfile = await AsyncStorage.getItem(`user_profile_${uid}`);
+        if (cachedProfile) {
+          const profile = JSON.parse(cachedProfile) as UserProfile;
+          const updatedProfile = {
+            ...profile,
+            ...data,
+            updatedAt: new Date().toISOString(),
+          };
+          await AsyncStorage.setItem(`user_profile_${uid}`, JSON.stringify(updatedProfile));
+          console.log("Profile updated in cache (offline mode)");
+          return; // オフラインモードでもキャッシュ更新成功と見なす
+        }
+      } catch (cacheError) {
+        console.warn("Error updating cache:", cacheError);
+      }
+    }
+    
     throw error;
   }
 }
