@@ -105,6 +105,114 @@ export default function HomeScreen() {
             </Text>
           </View>
 
+          {/* 地域のトップニュース */}
+          {regionNews && regionNews.length > 0 && userPrefecture && (
+            <View>
+              <View className="flex-row justify-between items-center mb-3 px-4">
+                <Text className="text-lg font-bold text-foreground">{userPrefecture}のトップニュース</Text>
+                <Pressable onPress={() => router.push("/(tabs)/news")}>
+                  <Text className="text-primary text-sm">もっと見る</Text>
+                </Pressable>
+              </View>
+              <FlatList
+                data={regionNews}
+                keyExtractor={(item) => item.id.toString()}
+                horizontal
+                scrollEnabled
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => router.push(`/news/${item.id}` as any)}
+                    className="bg-surface rounded-2xl overflow-hidden border border-border active:opacity-80"
+                    style={{ width: 280 }}
+                  >
+                    {item.imageUrl ? (
+                      <Image
+                        source={{ uri: item.imageUrl }}
+                        className="w-full h-40 bg-muted"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View className="w-full h-40 bg-muted items-center justify-center">
+                        <Text className="text-xs text-muted">画像</Text>
+                      </View>
+                    )}
+                    <View className="p-3">
+                      <Text className="text-xs text-primary font-semibold mb-1">
+                        {item.category}
+                      </Text>
+                      <Text className="text-sm font-bold text-foreground line-clamp-2 mb-2">
+                        {item.title}
+                      </Text>
+                      <Text className="text-xs text-muted">
+                        {new Date(item.createdAt).toLocaleDateString("ja-JP")}
+                      </Text>
+                    </View>
+                  </Pressable>
+                )}
+              />
+            </View>
+          )}
+
+          {/* 地域のイベント */}
+          {regionEvents && regionEvents.length > 0 && userPrefecture && (
+            <View>
+              <View className="flex-row justify-between items-center mb-3 px-4">
+                <Text className="text-lg font-bold text-foreground">{userPrefecture}のイベント</Text>
+                <Pressable onPress={() => router.push("/(tabs)/events")}>
+                  <Text className="text-primary text-sm">もっと見る</Text>
+                </Pressable>
+              </View>
+              <FlatList
+                data={regionEvents}
+                keyExtractor={(item) => item.id.toString()}
+                horizontal
+                scrollEnabled
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => router.push(`/events/${item.id}` as any)}
+                    className="bg-surface rounded-2xl overflow-hidden border border-border active:opacity-80"
+                    style={{ width: 280 }}
+                  >
+                    {item.imageUrl ? (
+                      <Image
+                        source={{ uri: item.imageUrl }}
+                        className="w-full h-40 bg-muted"
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View className="w-full h-40 bg-muted items-center justify-center">
+                        <Text className="text-xs text-muted">画像</Text>
+                      </View>
+                    )}
+                    <View className="p-3">
+                      <Text className="text-foreground font-bold text-sm mb-2" numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      <View className="gap-1">
+                        <View className="flex-row items-center">
+                          <Text className="text-muted text-xs mr-2">📅</Text>
+                          <Text className="text-muted text-xs">
+                            {new Date(item.eventDate).toLocaleDateString("ja-JP")}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-center">
+                          <Text className="text-muted text-xs mr-2">📍</Text>
+                          <Text className="text-muted text-xs" numberOfLines={1}>
+                            {item.venue}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </Pressable>
+                )}
+              />
+            </View>
+          )}
+
           {/* 全国のトップニュース */}
           <View>
             <View className="flex-row justify-between items-center mb-3 px-4">
@@ -170,114 +278,6 @@ export default function HomeScreen() {
               </View>
               <FlatList
                 data={upcomingEvents}
-                keyExtractor={(item) => item.id.toString()}
-                horizontal
-                scrollEnabled
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-                renderItem={({ item }) => (
-                  <Pressable
-                    onPress={() => router.push(`/events/${item.id}` as any)}
-                    className="bg-surface rounded-2xl overflow-hidden border border-border active:opacity-80"
-                    style={{ width: 280 }}
-                  >
-                    {item.imageUrl ? (
-                      <Image
-                        source={{ uri: item.imageUrl }}
-                        className="w-full h-40 bg-muted"
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View className="w-full h-40 bg-muted items-center justify-center">
-                        <Text className="text-xs text-muted">画像</Text>
-                      </View>
-                    )}
-                    <View className="p-3">
-                      <Text className="text-foreground font-bold text-sm mb-2" numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                      <View className="gap-1">
-                        <View className="flex-row items-center">
-                          <Text className="text-muted text-xs mr-2">📅</Text>
-                          <Text className="text-muted text-xs">
-                            {new Date(item.eventDate).toLocaleDateString("ja-JP")}
-                          </Text>
-                        </View>
-                        <View className="flex-row items-center">
-                          <Text className="text-muted text-xs mr-2">📍</Text>
-                          <Text className="text-muted text-xs" numberOfLines={1}>
-                            {item.venue}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </Pressable>
-                )}
-              />
-            </View>
-          )}
-
-          {/* 地域のニュース */}
-          {regionNews && regionNews.length > 0 && userPrefecture && (
-            <View>
-              <View className="flex-row justify-between items-center mb-3 px-4">
-                <Text className="text-lg font-bold text-foreground">{userPrefecture}のニュース</Text>
-                <Pressable onPress={() => router.push("/(tabs)/news")}>
-                  <Text className="text-primary text-sm">もっと見る</Text>
-                </Pressable>
-              </View>
-              <FlatList
-                data={regionNews}
-                keyExtractor={(item) => item.id.toString()}
-                horizontal
-                scrollEnabled
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-                renderItem={({ item }) => (
-                  <Pressable
-                    onPress={() => router.push(`/news/${item.id}` as any)}
-                    className="bg-surface rounded-2xl overflow-hidden border border-border active:opacity-80"
-                    style={{ width: 280 }}
-                  >
-                    {item.imageUrl ? (
-                      <Image
-                        source={{ uri: item.imageUrl }}
-                        className="w-full h-40 bg-muted"
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View className="w-full h-40 bg-muted items-center justify-center">
-                        <Text className="text-xs text-muted">画像</Text>
-                      </View>
-                    )}
-                    <View className="p-3">
-                      <Text className="text-xs text-primary font-semibold mb-1">
-                        {item.category}
-                      </Text>
-                      <Text className="text-sm font-bold text-foreground line-clamp-2 mb-2">
-                        {item.title}
-                      </Text>
-                      <Text className="text-xs text-muted">
-                        {new Date(item.createdAt).toLocaleDateString("ja-JP")}
-                      </Text>
-                    </View>
-                  </Pressable>
-                )}
-              />
-            </View>
-          )}
-
-          {/* 地域のイベント */}
-          {regionEvents && regionEvents.length > 0 && userPrefecture && (
-            <View>
-              <View className="flex-row justify-between items-center mb-3 px-4">
-                <Text className="text-lg font-bold text-foreground">{userPrefecture}のイベント</Text>
-                <Pressable onPress={() => router.push("/(tabs)/events")}>
-                  <Text className="text-primary text-sm">もっと見る</Text>
-                </Pressable>
-              </View>
-              <FlatList
-                data={regionEvents}
                 keyExtractor={(item) => item.id.toString()}
                 horizontal
                 scrollEnabled
