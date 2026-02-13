@@ -18,25 +18,12 @@ export default function HomeScreen() {
     return profile.address.split(" ")[0];
   }, [profile?.address]);
 
-  // トップニュース取得
-  const { data: topNews, refetch: refetchTopNews, isLoading: loadingTopNews } = trpc.articles.list.useQuery({
-    limit: 10,
-  });
-
   // 地域ニュース取得（フィルタリングなし、全国の地域ニュースを取得）
   const { data: allRegionNews, refetch: refetchRegionNews } = trpc.articles.list.useQuery(
     {
       limit: 50, // より多く取得してからフィルタリング
     },
     { enabled: !!userPrefecture }
-  );
-
-  // 参加予定イベント取得
-  const { data: upcomingEvents, refetch: refetchUpcomingEvents } = trpc.events.list.useQuery(
-    {
-      limit: 10,
-    },
-    { enabled: !!user?.uid }
   );
 
   // 地域イベント取得（フィルタリングなし、全国の地域イベントを取得）
@@ -46,6 +33,11 @@ export default function HomeScreen() {
     },
     { enabled: !!userPrefecture }
   );
+
+  // トップニュース取得（全国）
+  const { data: topNews, refetch: refetchTopNews, isLoading: loadingTopNews } = trpc.articles.list.useQuery({
+    limit: 10,
+  });
 
   // ユーザーの県に該当するニュースをフィルタリング
   const regionNews = useMemo(() => {
@@ -69,10 +61,9 @@ export default function HomeScreen() {
     setRefreshing(true);
     try {
       await Promise.all([
-        refetchTopNews(),
         refetchRegionNews(),
-        refetchUpcomingEvents(),
         refetchRegionEvents(),
+        refetchTopNews(),
       ]);
     } finally {
       setRefreshing(false);
@@ -105,7 +96,7 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          {/* 地域のトップニュース */}
+          {/* 1. 地域のトップニュース */}
           {regionNews && regionNews.length > 0 && userPrefecture && (
             <View>
               <View className="flex-row justify-between items-center mb-3 px-4">
@@ -155,7 +146,7 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* 地域のイベント */}
+          {/* 2. 地域のイベント */}
           {regionEvents && regionEvents.length > 0 && userPrefecture && (
             <View>
               <View className="flex-row justify-between items-center mb-3 px-4">
@@ -213,7 +204,7 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* 全国のトップニュース */}
+          {/* 3. 全国のトップニュース */}
           <View>
             <View className="flex-row justify-between items-center mb-3 px-4">
               <Text className="text-lg font-bold text-foreground">全国のトップニュース</Text>
@@ -266,64 +257,6 @@ export default function HomeScreen() {
               </View>
             )}
           </View>
-
-          {/* 参加予定のイベント */}
-          {upcomingEvents && upcomingEvents.length > 0 && user && (
-            <View>
-              <View className="flex-row justify-between items-center mb-3 px-4">
-                <Text className="text-lg font-bold text-foreground">参加予定のイベント</Text>
-                <Pressable onPress={() => router.push("/(tabs)/events")}>
-                  <Text className="text-primary text-sm">もっと見る</Text>
-                </Pressable>
-              </View>
-              <FlatList
-                data={upcomingEvents}
-                keyExtractor={(item) => item.id.toString()}
-                horizontal
-                scrollEnabled
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-                renderItem={({ item }) => (
-                  <Pressable
-                    onPress={() => router.push(`/events/${item.id}` as any)}
-                    className="bg-surface rounded-2xl overflow-hidden border border-border active:opacity-80"
-                    style={{ width: 280 }}
-                  >
-                    {item.imageUrl ? (
-                      <Image
-                        source={{ uri: item.imageUrl }}
-                        className="w-full h-40 bg-muted"
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View className="w-full h-40 bg-muted items-center justify-center">
-                        <Text className="text-xs text-muted">画像</Text>
-                      </View>
-                    )}
-                    <View className="p-3">
-                      <Text className="text-foreground font-bold text-sm mb-2" numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                      <View className="gap-1">
-                        <View className="flex-row items-center">
-                          <Text className="text-muted text-xs mr-2">📅</Text>
-                          <Text className="text-muted text-xs">
-                            {new Date(item.eventDate).toLocaleDateString("ja-JP")}
-                          </Text>
-                        </View>
-                        <View className="flex-row items-center">
-                          <Text className="text-muted text-xs mr-2">📍</Text>
-                          <Text className="text-muted text-xs" numberOfLines={1}>
-                            {item.venue}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </Pressable>
-                )}
-              />
-            </View>
-          )}
         </View>
       </ScrollView>
     </ScreenContainer>
