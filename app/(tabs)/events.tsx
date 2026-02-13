@@ -92,23 +92,9 @@ export default function EventsScreen() {
           </View>
         )}
 
-        {/* タブ切り替え（地域のイベント / 全国のイベント） */}
+        {/* タブ切り替え（全国のイベント / 地域のイベント） */}
         {user && (
           <View className="px-6 pb-4 flex-row gap-3">
-            <TouchableOpacity
-              className={`flex-1 py-3 rounded-xl border ${
-                activeTab === "region" ? "bg-primary border-primary" : "bg-surface border-border"
-              }`}
-              onPress={() => setActiveTab("region")}
-            >
-              <Text
-                className={`text-center font-semibold ${
-                  activeTab === "region" ? "text-background" : "text-foreground"
-                }`}
-              >
-                地域のイベント
-              </Text>
-            </TouchableOpacity>
             <TouchableOpacity
               className={`flex-1 py-3 rounded-xl border ${
                 activeTab === "national" ? "bg-primary border-primary" : "bg-surface border-border"
@@ -121,6 +107,20 @@ export default function EventsScreen() {
                 }`}
               >
                 全国のイベント
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className={`flex-1 py-3 rounded-xl border ${
+                activeTab === "region" ? "bg-primary border-primary" : "bg-surface border-border"
+              }`}
+              onPress={() => setActiveTab("region")}
+            >
+              <Text
+                className={`text-center font-semibold ${
+                  activeTab === "region" ? "text-background" : "text-foreground"
+                }`}
+              >
+                地域のイベント
               </Text>
             </TouchableOpacity>
           </View>
