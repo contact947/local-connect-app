@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from "react-native";
+import { useState, useEffect, useMemo } from "react";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, RefreshControl, TextInput } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useColors } from "@/hooks/use-colors";
@@ -13,6 +13,7 @@ export default function GiftsScreen() {
   const { user } = useFirebaseAuthContext();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   useEffect(() => {
     if (user) {
@@ -47,6 +48,17 @@ export default function GiftsScreen() {
       enabled: !!user && !!location,
     }
   );
+
+  // キーワード検索でフィルタリング
+  const filteredGifts = useMemo(() => {
+    if (!searchQuery.trim()) return nearbyGifts || [];
+    const query = searchQuery.toLowerCase();
+    return (nearbyGifts || []).filter((gift) =>
+      gift.giftTitle.toLowerCase().includes(query) ||
+      gift.storeName.toLowerCase().includes(query) ||
+      (gift.description && gift.description.toLowerCase().includes(query))
+    );
+  }, [nearbyGifts, searchQuery]);
 
   // Pull to Refresh
   const { refreshing, onRefresh } = usePullToRefresh(refetch);
@@ -86,6 +98,20 @@ export default function GiftsScreen() {
           </View>
         )}
 
+        {/* 検索バー */}
+        {user && location && (
+          <View className="px-6 pb-4">
+            <TextInput
+              className="w-full px-4 py-3 rounded-xl border border-border bg-surface text-foreground"
+              placeholder="検索..."
+              placeholderTextColor={colors.muted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+            />
+          </View>
+        )}
+
         {/* ギフト一覧 */}
         <ScrollView
           className="flex-1 px-6"
@@ -107,9 +133,9 @@ export default function GiftsScreen() {
                 {!user ? "ログインしてギフトを表示" : "位置情報を取得中..."}
               </Text>
             </View>
-          ) : nearbyGifts && nearbyGifts.length > 0 ? (
+          ) : filteredGifts && filteredGifts.length > 0 ? (
             <View className="gap-4 pb-6">
-              {nearbyGifts.map((gift) => (
+              {filteredGifts.map((gift) => (
                 <TouchableOpacity
                   key={gift.id}
                   className="bg-surface rounded-2xl overflow-hidden border border-border"

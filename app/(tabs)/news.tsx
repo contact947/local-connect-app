@@ -1,9 +1,10 @@
-import { ScrollView, Text, View, TouchableOpacity, RefreshControl, FlatList, ActivityIndicator } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, RefreshControl, FlatList, ActivityIndicator, TextInput } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
 import { useFirebaseAuthContext } from "@/lib/firebase-auth-provider-modular";
 import { router } from "expo-router";
 import { useState, useCallback, useMemo } from "react";
+import { useColors } from "@/hooks/use-colors";
 
 const categories = [
   { label: "すべて", value: "all" as const },
@@ -16,9 +17,11 @@ const categories = [
 type NewsTab = "national" | "region";
 
 export default function NewsScreen() {
+  const colors = useColors();
   const { user, profile } = useFirebaseAuthContext();
   const [activeTab, setActiveTab] = useState<NewsTab>("national");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
 
   // 全国のニュース取得
@@ -73,7 +76,26 @@ export default function NewsScreen() {
     );
   }, [regionNews]);
 
-  const newsData = activeTab === "national" ? sortedNationalNews : sortedRegionNews;
+  // キーワード検索でフィルタリング
+  const filteredNationalNews = useMemo(() => {
+    if (!searchQuery.trim()) return sortedNationalNews;
+    const query = searchQuery.toLowerCase();
+    return sortedNationalNews.filter((article) =>
+      article.title.toLowerCase().includes(query) ||
+      (article.content && article.content.toLowerCase().includes(query))
+    );
+  }, [sortedNationalNews, searchQuery]);
+
+  const filteredRegionNews = useMemo(() => {
+    if (!searchQuery.trim()) return sortedRegionNews;
+    const query = searchQuery.toLowerCase();
+    return sortedRegionNews.filter((article) =>
+      article.title.toLowerCase().includes(query) ||
+      (article.content && article.content.toLowerCase().includes(query))
+    );
+  }, [sortedRegionNews, searchQuery]);
+
+  const newsData = activeTab === "national" ? filteredNationalNews : filteredRegionNews;
   const isLoading = activeTab === "national" ? loadingNational : loadingRegion;
 
   const onRefresh = useCallback(async () => {
@@ -118,6 +140,18 @@ export default function NewsScreen() {
               </Text>
             </View>
 
+            {/* 検索バー */}
+            <View className="mb-4">
+              <TextInput
+                className="w-full px-4 py-3 rounded-xl border border-border bg-surface text-foreground"
+                placeholder="検索..."
+                placeholderTextColor={colors.muted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+              />
+            </View>
+
             {/* タブ切り替え（全国のニュース / 地域のニュース） */}
             <View className="flex-row gap-3 mb-4">
               <TouchableOpacity
@@ -150,7 +184,7 @@ export default function NewsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* カテゴリフィルター */}
+            {/* カテゴリフィター */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert, RefreshControl, Pressable } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator, Image, Alert, RefreshControl, Pressable, TextInput } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useColors } from "@/hooks/use-colors";
@@ -13,6 +13,7 @@ export default function EventsScreen() {
   const colors = useColors();
   const { user, profile } = useFirebaseAuthContext();
   const [activeTab, setActiveTab] = useState<EventTab>("national");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
 
 
@@ -53,6 +54,25 @@ export default function EventsScreen() {
     });
   }, [allRegionEvents, userPrefecture]);
 
+  // キーワード検索でフィルタリング
+  const filteredNationalEvents = useMemo(() => {
+    if (!searchQuery.trim()) return nationalEvents || [];
+    const query = searchQuery.toLowerCase();
+    return (nationalEvents || []).filter((event) =>
+      event.title.toLowerCase().includes(query) ||
+      (event.description && event.description.toLowerCase().includes(query))
+    );
+  }, [nationalEvents, searchQuery]);
+
+  const filteredRegionEvents = useMemo(() => {
+    if (!searchQuery.trim()) return regionEvents || [];
+    const query = searchQuery.toLowerCase();
+    return (regionEvents || []).filter((event) =>
+      event.title.toLowerCase().includes(query) ||
+      (event.description && event.description.toLowerCase().includes(query))
+    );
+  }, [regionEvents, searchQuery]);
+
   // Pull to Refresh
   const { refreshing: nationalRefreshing, onRefresh: onRefreshNational } = usePullToRefresh(refetchNationalEvents);
   const { refreshing: regionRefreshing, onRefresh: onRefreshRegion } = usePullToRefresh(refetchRegionEvents);
@@ -61,7 +81,7 @@ export default function EventsScreen() {
     router.push(`/events/${eventId}`);
   };
 
-  const eventData = (activeTab === "national" ? nationalEvents : regionEvents) || [];
+  const eventData = (activeTab === "national" ? filteredNationalEvents : filteredRegionEvents) || [];
   const isLoading = activeTab === "national" ? nationalLoading : regionLoading;
   const refreshing = activeTab === "national" ? nationalRefreshing : regionRefreshing;
   const onRefresh = activeTab === "national" ? onRefreshNational : onRefreshRegion;
@@ -89,6 +109,20 @@ export default function EventsScreen() {
             >
               <Text className="text-center font-semibold text-background">ログイン</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/* 検索バー */}
+        {user && (
+          <View className="px-6 pb-4">
+            <TextInput
+              className="w-full px-4 py-3 rounded-xl border border-border bg-surface text-foreground"
+              placeholder="検索..."
+              placeholderTextColor={colors.muted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+            />
           </View>
         )}
 
