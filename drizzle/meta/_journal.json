@@ -15,6 +15,13 @@
       "when": 1770136982002,
       "tag": "0001_quiet_electro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1770976901587,
+      "tag": "0002_legal_fantastic_four",
+      "breakpoints": true
     }
   ]
 }

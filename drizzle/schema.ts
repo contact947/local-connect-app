@@ -35,6 +35,9 @@ export const userProfiles = mysqlTable("user_profiles", {
   prefecture: varchar("prefecture", { length: 50 }), // 都道府県
   city: varchar("city", { length: 100 }), // 市区町村
   schoolType: mysqlEnum("schoolType", ["high_school", "university", "working", "other"]),
+  profileImageData: text("profileImageData"), // Base64形式のプロフィール画像データ
+  profileImageFileName: varchar("profileImageFileName", { length: 255 }), // プロフィール画像ファイル名
+  profileImageMimeType: varchar("profileImageMimeType", { length: 50 }), // プロフィール画像のMIMEタイプ
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -48,6 +51,9 @@ export const articles = mysqlTable("articles", {
   prefecture: varchar("prefecture", { length: 50 }), // 都道府県
   city: varchar("city", { length: 100 }), // 市区町村
   imageUrl: text("imageUrl"),
+  imageData: text("imageData"), // Base64形式の画像データ
+  imageFileName: varchar("imageFileName", { length: 255 }), // 画像ファイル名
+  imageMimeType: varchar("imageMimeType", { length: 50 }), // 画像のMIMEタイプ
   viewCount: int("viewCount").default(0).notNull(),
   publishedAt: timestamp("publishedAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -65,6 +71,9 @@ export const events = mysqlTable("events", {
   prefecture: varchar("prefecture", { length: 50 }), // 都道府県
   city: varchar("city", { length: 100 }), // 市区町村
   imageUrl: text("imageUrl"),
+  imageData: text("imageData"), // Base64形式の画像データ
+  imageFileName: varchar("imageFileName", { length: 255 }), // 画像ファイル名
+  imageMimeType: varchar("imageMimeType", { length: 50 }), // 画像のMIMEタイプ
   capacity: int("capacity"), // 定員
   availableTickets: int("availableTickets"), // 残りチケット数
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -98,6 +107,9 @@ export const gifts = mysqlTable("gifts", {
   prefecture: varchar("prefecture", { length: 50 }),
   city: varchar("city", { length: 100 }),
   imageUrl: text("imageUrl"),
+  imageData: text("imageData"), // Base64形式の画像データ
+  imageFileName: varchar("imageFileName", { length: 255 }), // 画像ファイル名
+  imageMimeType: varchar("imageMimeType", { length: 50 }), // 画像のMIMEタイプ
   expiryDate: timestamp("expiryDate"), // 有効期限
   usageLimit: int("usageLimit").default(1).notNull(), // 1人あたりの使用回数制限
   ageRestriction: int("ageRestriction"), // 年齢制限（例: 18歳以上）
